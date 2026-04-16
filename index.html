@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FN Detector</title>
+    <meta
+      name="description"
+      content="FN Detector is a deployable fake-news screening workspace with browser-based transformer inference and a responsive review dashboard."
+    />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/web/main.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <a class="brand" href="#hero">
+          <span class="brand-mark">FN</span>
+          <span class="brand-copy">
+            <strong>FN Detector</strong>
+            <span>Fake-news review workspace</span>
+          </span>
+        </a>
+        <nav class="nav">
+          <a href="#console">Console</a>
+          <a href="#metrics">Metrics</a>
+          <a href="#workflow">Workflow</a>
+        </nav>
+      </header>
+
+      <main>
+        <section class="hero" id="hero">
+          <div class="hero-copy sticker-card hero-panel">
+            <p class="eyebrow">Production-ready screening interface</p>
+            <h1>Review suspicious headlines with a lightweight transformer that fits a real laptop.</h1>
+            <p class="hero-text">
+              FN Detector packages local CPU training, a deployable prediction API, and a
+              responsive analysis console into one GitHub-ready project.
+            </p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="#console">
+                Start a prediction
+                <span class="button-icon" aria-hidden="true">→</span>
+              </a>
+              <a class="button button-secondary" href="#metrics">See model metrics</a>
+            </div>
+            <ul class="hero-pills" aria-label="project highlights">
+              <li>CPU-safe training preset</li>
+              <li>Vercel-ready prediction API</li>
+              <li>Responsive analyst dashboard</li>
+            </ul>
+          </div>
+
+          <div class="hero-visual">
+            <div class="shape shape-circle"></div>
+            <div class="shape shape-dots"></div>
+            <div class="shape shape-squiggle"></div>
+            <div class="hero-visual-card sticker-card">
+              <div class="signal-row">
+                <span class="signal-label">Model status</span>
+                <span class="status-badge" id="health-badge">Checking</span>
+              </div>
+              <div class="visual-grid">
+                <article class="mini-card accent-card">
+                  <span>Runtime</span>
+                  <strong>FastAPI</strong>
+                </article>
+                <article class="mini-card pink-card">
+                  <span>Training</span>
+                  <strong>Local CPU</strong>
+                </article>
+                <article class="mini-card yellow-card">
+                  <span>Output</span>
+                  <strong>Binary verdict</strong>
+                </article>
+                <article class="mini-card green-card">
+                  <span>Deploy target</span>
+                  <strong>Vercel + GitHub</strong>
+                </article>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="console-section" id="console">
+          <div class="section-heading">
+            <p class="eyebrow">Live classifier</p>
+            <h2>Article screening console</h2>
+            <p>
+              Paste a headline and article body to run the trained detector through the deployed
+              backend API.
+            </p>
+          </div>
+
+          <div class="console-grid">
+            <form class="sticker-card form-card" id="prediction-form">
+              <label class="field">
+                <span>Headline</span>
+                <input
+                  id="title"
+                  name="title"
+                  type="text"
+                  placeholder="Example: Analysts question viral policy announcement"
+                  maxlength="300"
+                />
+              </label>
+
+              <label class="field">
+                <span>Article body</span>
+                <textarea
+                  id="text"
+                  name="text"
+                  rows="10"
+                  placeholder="Paste the article body here for classification..."
+                  maxlength="25000"
+                  required
+                ></textarea>
+              </label>
+
+              <div class="form-actions">
+                <button class="button button-primary" type="submit" id="submit-button">
+                  Run analysis
+                  <span class="button-icon" aria-hidden="true">→</span>
+                </button>
+                <button class="button button-secondary" type="button" id="sample-button">
+                  Load sample text
+                </button>
+                <button class="button button-secondary" type="button" id="clear-button">
+                  Clear form
+                </button>
+              </div>
+
+              <p class="form-hint" id="status-copy" aria-live="polite">
+                The classifier is warming up. The first request may take slightly longer while the
+                backend model initializes.
+              </p>
+            </form>
+
+            <aside class="sticker-card result-card">
+              <div class="result-header">
+                <div>
+                  <p class="eyebrow">Prediction result</p>
+                  <h3 id="result-title">Ready for review</h3>
+                </div>
+                <span class="verdict-pill neutral" id="verdict-pill">Awaiting input</span>
+              </div>
+
+              <p class="result-summary" id="result-summary">
+                Submit a sample to see confidence scores, the predicted class, and model details.
+              </p>
+
+              <div class="score-stack" id="score-stack">
+                <div class="score-bar">
+                  <div class="score-label">
+                    <span>Real</span>
+                    <strong id="real-score">0%</strong>
+                  </div>
+                  <div class="meter">
+                    <span class="meter-fill meter-real" id="real-meter"></span>
+                  </div>
+                </div>
+
+                <div class="score-bar">
+                  <div class="score-label">
+                    <span>Fake</span>
+                    <strong id="fake-score">0%</strong>
+                  </div>
+                  <div class="meter">
+                    <span class="meter-fill meter-fake" id="fake-meter"></span>
+                  </div>
+                </div>
+              </div>
+
+              <dl class="result-meta">
+                <div>
+                  <dt>Model</dt>
+                  <dd id="result-model">Not loaded</dd>
+                </div>
+                <div>
+                  <dt>Confidence</dt>
+                  <dd id="result-confidence">0%</dd>
+                </div>
+                <div>
+                  <dt>Input length</dt>
+                  <dd id="result-length">0 chars</dd>
+                </div>
+              </dl>
+            </aside>
+          </div>
+        </section>
+
+        <section class="metrics-section" id="metrics">
+          <div class="section-heading">
+            <p class="eyebrow">Model snapshot</p>
+            <h2>Training and evaluation metrics</h2>
+            <p>
+              This panel reads model metadata from the deployed backend so the deployment stays
+              transparent about how it was trained.
+            </p>
+          </div>
+
+          <div class="metric-grid" id="metric-grid">
+            <article class="sticker-card metric-card">
+              <span>Accuracy</span>
+              <strong>Loading...</strong>
+              <p>Retrieving metrics from the prediction service.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="workflow-section" id="workflow">
+          <div class="section-heading">
+            <p class="eyebrow">Operational shape</p>
+            <h2>How this production flow is set up</h2>
+          </div>
+
+          <div class="workflow-grid">
+            <article class="sticker-card workflow-card">
+              <div class="workflow-icon accent-card">1</div>
+              <h3>Train locally</h3>
+              <p>
+                Use the CPU-safe preset to build a small transformer checkpoint without overwhelming
+                an 8 GB laptop.
+              </p>
+            </article>
+            <article class="sticker-card workflow-card">
+              <div class="workflow-icon pink-card">2</div>
+              <h3>Commit the deploy artifact</h3>
+              <p>
+                Package the trained checkpoint, tokenizer, and metrics so the API can serve
+                predictions consistently.
+              </p>
+            </article>
+            <article class="sticker-card workflow-card">
+              <div class="workflow-icon yellow-card">3</div>
+              <h3>Ship to Vercel</h3>
+              <p>
+                Vercel hosts the whole experience as a static app, while the heavy training
+                workflow stays local where it belongs.
+              </p>
+            </article>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <p>FN Detector pairs a playful geometric interface with a deployable backend-powered classifier.</p>
+        <a href="https://github.com/anushka9480-alt/FNdetector" target="_blank" rel="noreferrer">
+          View GitHub repository
+        </a>
+      </footer>
+    </div>
+
+    <script src="/web/main.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+.venv/
+.env
+*.env
+.vercel/
+browser-model/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.pytest_cache/
+node_modules/
+models/
+data/
+deployment/
+frontend/node_modules/
+frontend/dist/
+dist/
+.vercel
