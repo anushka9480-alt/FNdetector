@@ -21,8 +21,7 @@ def main() -> None:
     processed_dir = ROOT / "data" / "processed"
 
     dataset = load_raw_dataset(
-        fake_path=raw_dir / "fake_news.csv",
-        true_path=raw_dir / "true_news.csv",
+        dataset_path=raw_dir / "WELFake_Dataset.csv",
     )
 
     full_splits = create_full_splits(dataset, seed=42)

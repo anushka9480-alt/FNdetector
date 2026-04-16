@@ -20,20 +20,19 @@ def build_combined_text(title: str, text: str) -> str:
     return title or text
 
 
-def load_raw_dataset(fake_path: Path, true_path: Path) -> pd.DataFrame:
-    fake_df = pd.read_csv(fake_path)
-    true_df = pd.read_csv(true_path)
+def load_raw_dataset(dataset_path: Path) -> pd.DataFrame:
+    combined = pd.read_csv(dataset_path)
 
-    fake_df["label"] = 1
-    fake_df["label_name"] = "fake"
-    true_df["label"] = 0
-    true_df["label_name"] = "real"
+    # Coerce column names to lowercase (e.g. Title -> title)
+    combined.columns = [str(c).lower() for c in combined.columns]
 
-    combined = pd.concat([fake_df, true_df], ignore_index=True)
-    combined["title"] = combined["title"].map(normalize_text)
-    combined["text"] = combined["text"].map(normalize_text)
-    combined["subject"] = combined["subject"].map(normalize_text)
-    combined["date"] = combined["date"].map(normalize_text)
+    # Map labels (WELFake: 0=fake, 1=real)
+    combined["label_name"] = combined["label"].map({0: "fake", 1: "real"})
+
+    # Map texts, dealing with nulls or missing smoothly
+    combined["title"] = combined.get("title", pd.Series([""] * len(combined))).fillna("").map(normalize_text)
+    combined["text"] = combined.get("text", pd.Series([""] * len(combined))).fillna("").map(normalize_text)
+
     combined["combined_text"] = [
         build_combined_text(title, text)
         for title, text in zip(combined["title"], combined["text"])
@@ -41,7 +40,7 @@ def load_raw_dataset(fake_path: Path, true_path: Path) -> pd.DataFrame:
 
     combined = combined.loc[combined["combined_text"].str.len() > 0].copy()
     combined = combined[
-        ["title", "text", "combined_text", "subject", "date", "label", "label_name"]
+        ["title", "text", "combined_text", "label", "label_name"]
     ].reset_index(drop=True)
     return combined
 

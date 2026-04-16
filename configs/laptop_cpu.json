@@ -6,7 +6,7 @@
   "text_column": "combined_text",
   "label_column": "label",
   "output_dir": "models/laptop_cpu",
-  "max_length": 192,
+  "max_length": 128,
   "train_batch_size": 4,
   "eval_batch_size": 4,
   "gradient_accumulation_steps": 4,

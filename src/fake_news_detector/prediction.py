@@ -13,7 +13,7 @@ from transformers import (
 )
 
 
-LABEL_MAP = {0: "real", 1: "fake"}
+LABEL_MAP = {0: "fake", 1: "real"}
 DEFAULT_TOKENIZER_NAME = "bert-base-uncased"
 
 
@@ -153,7 +153,7 @@ def predict_text(model_dir: Path, text: str) -> dict:
         "model_name": bundle.model_name,
         "text_length": len(cleaned_text),
         "scores": {
-            "real": float(probabilities[0].item()),
-            "fake": float(probabilities[1].item()),
+            "fake": float(probabilities[0].item()),
+            "real": float(probabilities[1].item()),
         },
     }
