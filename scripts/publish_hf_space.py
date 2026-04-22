@@ -20,11 +20,15 @@ def load_project_env() -> None:
         key, value = line.split("=", 1)
         key = key.strip()
         value = value.strip()
-        if not key or key in os.environ:
+        if not key:
             continue
         if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
             value = value[1:-1]
-        os.environ[key] = value
+
+        # Prefer values from the repo-local .env for auth tokens to avoid accidentally
+        # reusing a stale token already present in the environment.
+        if key in {"HF_TOKEN", "HUGGINGFACEHUB_API_TOKEN"} or key not in os.environ:
+            os.environ[key] = value
 
 
 def parse_args():
