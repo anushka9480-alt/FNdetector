@@ -434,6 +434,28 @@ export function Deepfake() {
               </div>
             </div>
           </div>
+
+          <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6">
+            <h3 className="text-xl font-bold text-white mb-4">Sample Test Image</h3>
+            <p className="text-neutral-400 mb-4">
+              Use this bundled sample image to smoke-test the detector after deployment.
+            </p>
+            <a
+              href="/samples/deepfake-sample.png"
+              target="_blank"
+              rel="noreferrer"
+              className="block rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-950 hover:border-cyan-500/60 transition-colors"
+            >
+              <img
+                src="/samples/deepfake-sample.png"
+                alt="Sample deepfake test"
+                className="w-full h-56 object-cover"
+              />
+            </a>
+            <p className="text-sm text-neutral-500 mt-3">
+              Open the image, save it locally if needed, then upload it on this page to test the end-to-end flow.
+            </p>
+          </div>
         </motion.aside>
       </div>
     </div>

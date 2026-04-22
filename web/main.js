@@ -73,7 +73,9 @@ function setHealthBadge(label, statusClass) {
 }
 
 function setStatusCopy(message) {
-  elements.statusCopy.textContent = message;
+  if (elements.statusCopy) {
+    elements.statusCopy.textContent = message;
+  }
 }
 
 async function loadModelMetadata() {
@@ -177,6 +179,7 @@ async function loadDashboard() {
 
     renderMetrics(metadata);
     setHealthBadge("Ready", "ok");
+    elements.resultModel.textContent = healthResponse.model || "Loaded";
     setStatusCopy(
       `Backend model ready. Active model ${healthResponse.model} with max length ${healthResponse.max_length}.`,
     );
