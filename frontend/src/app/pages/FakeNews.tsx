@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import {
   AlertTriangle,
+  BookOpenText,
   CheckCircle,
+  Info,
   LoaderCircle,
   RefreshCw,
   Search,
@@ -23,45 +25,6 @@ type PredictApiPayload = PredictionResponse | {
   prediction?: PredictionResponse;
 };
 
-type WorkflowPreset = {
-  key: string;
-  label: string;
-  description: string;
-  available: boolean;
-  default_epochs: number;
-};
-
-type WorkflowResponse = {
-  recommended_sequence: string[];
-  presets: WorkflowPreset[];
-};
-
-type HealthResponse = {
-  status: string;
-  active_model: string | null;
-  running_jobs: number;
-};
-
-type ModelResponse = {
-  available: boolean;
-  active_model: null | {
-    path: string;
-    preset: string | null;
-    metrics: {
-      accuracy?: number;
-      f1_fake?: number;
-    } | null;
-  };
-};
-
-type TrainJob = {
-  job_id: string;
-  status: string;
-  preset: string;
-  output_dir: string;
-  error: string | null;
-};
-
 function getResultDetails(result: PredictionResponse | null) {
   if (!result) {
     return null;
@@ -75,7 +38,7 @@ function getResultDetails(result: PredictionResponse | null) {
         color: "text-red-500",
         bg: "bg-red-500/10 border-red-500/30",
         title: "High Risk of Disinformation",
-        text: "The model strongly associates this text with the fake-news class.",
+        text: "The text-only classifier strongly associates this sample with the fake-news class.",
         percent: fakePercent,
       };
     }
@@ -85,7 +48,7 @@ function getResultDetails(result: PredictionResponse | null) {
       color: "text-amber-500",
       bg: "bg-amber-500/10 border-amber-500/30",
       title: "Suspicious Signals Found",
-      text: "The model leans fake, but confidence is moderate enough that human review still matters.",
+      text: "The classifier leans fake, but confidence is moderate enough that human review still matters.",
       percent: fakePercent,
     };
   }
@@ -94,8 +57,8 @@ function getResultDetails(result: PredictionResponse | null) {
     icon: <CheckCircle className="w-16 h-16 text-emerald-500" />,
     color: "text-emerald-500",
     bg: "bg-emerald-500/10 border-emerald-500/30",
-    title: "More Likely Credible",
-    text: "The model currently leans toward the real-news class for this sample.",
+    title: "Model Leaning Real",
+    text: "The current text-only checkpoint leans toward the real-news class for this sample. That is not the same thing as verified truth.",
     percent: Math.round(result.scores.real * 100),
   };
 }
@@ -120,58 +83,6 @@ export function FakeNews() {
   const [status, setStatus] = useState<"idle" | "scanning" | "result">("idle");
   const [error, setError] = useState("");
   const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
-  const [workflow, setWorkflow] = useState<WorkflowResponse | null>(null);
-  const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [model, setModel] = useState<ModelResponse | null>(null);
-  const [trainJob, setTrainJob] = useState<TrainJob | null>(null);
-  const [isTraining, setIsTraining] = useState(false);
-
-  async function loadBackendState() {
-    try {
-      const [workflowResponse, healthResponse, modelResponse] = await Promise.all([
-        fetch(`${apiBaseUrl}/api/workflow`),
-        fetch(`${apiBaseUrl}/api/health`),
-        fetch(`${apiBaseUrl}/api/model`),
-      ]);
-
-      if (workflowResponse.ok) {
-        setWorkflow(await workflowResponse.json());
-      }
-      if (healthResponse.ok) {
-        setHealth(await healthResponse.json());
-      }
-      if (modelResponse.ok) {
-        setModel(await modelResponse.json());
-      }
-    } catch {
-      setError("Backend is not reachable yet. Start the API server to enable prediction and training.");
-    }
-  }
-
-  useEffect(() => {
-    void loadBackendState();
-  }, []);
-
-  useEffect(() => {
-    if (!trainJob || trainJob.status === "completed" || trainJob.status === "failed") {
-      return;
-    }
-
-    const timer = window.setInterval(() => {
-      void fetch(`${apiBaseUrl}/api/train/${trainJob.job_id}`)
-        .then((response) => response.json())
-        .then((payload: TrainJob) => {
-          setTrainJob(payload);
-          if (payload.status === "completed" || payload.status === "failed") {
-            setIsTraining(false);
-            void loadBackendState();
-          }
-        })
-        .catch(() => undefined);
-    }, 3000);
-
-    return () => window.clearInterval(timer);
-  }, [apiBaseUrl, trainJob]);
 
   async function handleScan() {
     const trimmed = input.trim();
@@ -213,33 +124,6 @@ export function FakeNews() {
     }
   }
 
-  async function handleTrain(preset: string) {
-    setIsTraining(true);
-    setError("");
-
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/train`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ preset }),
-      });
-
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.detail ?? "Training request failed.");
-      }
-
-      setTrainJob(payload);
-    } catch (requestError) {
-      const message =
-        requestError instanceof Error ? requestError.message : "Training request failed.";
-      setError(message);
-      setIsTraining(false);
-    }
-  }
-
   function reset() {
     setStatus("idle");
     setPrediction(null);
@@ -254,7 +138,6 @@ export function FakeNews() {
   }
 
   const details = getResultDetails(prediction);
-  const activeModel = model?.active_model;
 
   return (
     <div className="min-h-screen pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto flex flex-col items-center">
@@ -269,12 +152,11 @@ export function FakeNews() {
           Fact Check Engine
         </h1>
         <p className="text-xl text-neutral-400 max-w-3xl mx-auto">
-          This screen is connected to the local backend workflow. Run live predictions, inspect the
-          active model, and trigger smoke, quick, or full training presets without leaving the app.
+          This screen uses the deployed text-only detector for quick screening. It can help flag suspicious language patterns, but it does not verify sources, dates, or real-world claims on its own.
         </p>
       </motion.div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1.3fr_0.7fr] gap-8 w-full">
+      <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_0.65fr] gap-8 w-full">
         <AnimatePresence mode="wait">
           {status !== "result" ? (
             <motion.div
@@ -315,9 +197,7 @@ export function FakeNews() {
                     Load Sample
                   </button>
                 </div>
-                <span className="text-sm text-neutral-500 font-medium">
-                  Backend: {health?.status ?? "offline"}
-                </span>
+                <span className="text-sm text-neutral-500 font-medium">Text-only screening</span>
               </div>
 
               {status === "scanning" ? (
@@ -376,6 +256,12 @@ export function FakeNews() {
                   <p className="text-lg text-neutral-300 mb-4 max-w-xl mx-auto leading-relaxed">
                     {details.text}
                   </p>
+                  <div className="mb-6 w-full max-w-xl rounded-2xl border border-neutral-800 bg-neutral-950/70 p-4 text-left">
+                    <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 mb-2">Important</p>
+                    <p className="text-sm text-neutral-300">
+                      If you know this story is fabricated but the model still leans real, that means the current checkpoint is over-trusting the writing style of your sample. It is a text classifier, not a live fact-checking system.
+                    </p>
+                  </div>
                   <div className="grid grid-cols-2 gap-4 w-full max-w-xl mb-8">
                     <div className="rounded-2xl bg-neutral-950/80 border border-neutral-800 p-4">
                       <p className="text-sm text-neutral-500 uppercase tracking-wide">Real Score</p>
@@ -412,74 +298,21 @@ export function FakeNews() {
           className="space-y-6"
         >
           <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6">
-            <h3 className="text-xl font-bold text-white mb-4">Active Backend State</h3>
-            <div className="space-y-4">
-              <div className="rounded-2xl bg-neutral-950 border border-neutral-800 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 mb-2">API</p>
-                <p className="font-semibold text-white">{apiBaseUrl}</p>
+            <h3 className="text-xl font-bold text-white mb-4">What This Model Sees</h3>
+            <div className="space-y-3 text-neutral-300">
+              <div className="rounded-2xl bg-neutral-950 border border-neutral-800 p-4 flex items-start gap-3">
+                <BookOpenText className="w-5 h-5 text-indigo-400 mt-0.5" />
+                <p>It looks only at the text you paste. It does not inspect links, publishers, screenshots, or outside evidence.</p>
               </div>
-              <div className="rounded-2xl bg-neutral-950 border border-neutral-800 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 mb-2">Active Model</p>
-                <p className="font-semibold text-white break-all">{activeModel?.path ?? health?.active_model ?? "none"}</p>
+              <div className="rounded-2xl bg-neutral-950 border border-neutral-800 p-4 flex items-start gap-3">
+                <Info className="w-5 h-5 text-cyan-400 mt-0.5" />
+                <p>A fabricated article can still score “real” if it uses calm wording, resembles mainstream reporting, or avoids obvious clickbait cues.</p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-neutral-950 border border-neutral-800 p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 mb-2">Accuracy</p>
-                  <p className="text-2xl font-black text-white">
-                    {activeModel?.metrics?.accuracy !== undefined
-                      ? activeModel.metrics.accuracy.toFixed(2)
-                      : "--"}
-                  </p>
-                </div>
-                <div className="rounded-2xl bg-neutral-950 border border-neutral-800 p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 mb-2">F1 Fake</p>
-                  <p className="text-2xl font-black text-white">
-                    {activeModel?.metrics?.f1_fake !== undefined
-                      ? activeModel.metrics.f1_fake.toFixed(2)
-                      : "--"}
-                  </p>
-                </div>
+              <div className="rounded-2xl bg-neutral-950 border border-neutral-800 p-4 flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5" />
+                <p>Use this as a screening signal only. For stronger results, the fake-news model needs retraining or a retrieval-based fact-checking layer.</p>
               </div>
             </div>
-          </div>
-
-          <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6">
-            <h3 className="text-xl font-bold text-white mb-4">Training Workflow</h3>
-            <p className="text-neutral-400 mb-5">
-              The backend exposes smoke, quick, and full training presets and updates the active
-              model when a job completes.
-            </p>
-            <div className="space-y-3">
-              {workflow?.presets.map((preset) => (
-                <button
-                  key={preset.key}
-                  type="button"
-                  onClick={() => handleTrain(preset.key)}
-                  disabled={!preset.available || isTraining}
-                  className="w-full text-left rounded-2xl border border-neutral-800 bg-neutral-950 px-4 py-4 hover:border-indigo-500/40 hover:bg-neutral-900 transition-colors disabled:opacity-50"
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-bold text-white">{preset.label}</p>
-                      <p className="text-sm text-neutral-500 mt-1">{preset.description}</p>
-                    </div>
-                    <span className="text-xs uppercase tracking-[0.2em] text-indigo-400">
-                      {preset.key}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
-            {trainJob ? (
-              <div className="mt-5 rounded-2xl border border-neutral-800 bg-neutral-950 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 mb-2">Latest Training Job</p>
-                <p className="font-semibold text-white">{trainJob.job_id}</p>
-                <p className="text-neutral-400 mt-2">
-                  {trainJob.preset} {"->"} {trainJob.status}
-                </p>
-                {trainJob.error ? <p className="text-red-300 mt-2">{trainJob.error}</p> : null}
-              </div>
-            ) : null}
           </div>
         </motion.aside>
       </div>
