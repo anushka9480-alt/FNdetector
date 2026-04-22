@@ -18,6 +18,11 @@ type PredictionResponse = {
   };
 };
 
+type PredictApiPayload = PredictionResponse | {
+  status?: string;
+  prediction?: PredictionResponse;
+};
+
 type WorkflowPreset = {
   key: string;
   label: string;
@@ -93,6 +98,18 @@ function getResultDetails(result: PredictionResponse | null) {
     text: "The model currently leans toward the real-news class for this sample.",
     percent: Math.round(result.scores.real * 100),
   };
+}
+
+function normalizePredictionResponse(payload: PredictApiPayload): PredictionResponse | null {
+  if ("scores" in payload && payload.scores) {
+    return payload as PredictionResponse;
+  }
+
+  if ("prediction" in payload && payload.prediction?.scores) {
+    return payload.prediction;
+  }
+
+  return null;
 }
 
 export function FakeNews() {
@@ -176,12 +193,17 @@ export function FakeNews() {
         body: JSON.stringify({ text: trimmed }),
       });
 
-      const payload = await response.json();
+      const payload: PredictApiPayload = await response.json();
       if (!response.ok) {
-        throw new Error(payload.detail ?? payload.error ?? "Prediction failed.");
+        throw new Error((payload as { detail?: string; error?: string }).detail ?? (payload as { detail?: string; error?: string }).error ?? "Prediction failed.");
       }
 
-      setPrediction(payload);
+      const normalizedPrediction = normalizePredictionResponse(payload);
+      if (!normalizedPrediction) {
+        throw new Error("Prediction response was missing score data.");
+      }
+
+      setPrediction(normalizedPrediction);
       setStatus("result");
     } catch (requestError) {
       const message =
