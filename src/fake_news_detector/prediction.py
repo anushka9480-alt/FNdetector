@@ -8,6 +8,7 @@ import re
 os.environ.setdefault("TRANSFORMERS_NO_TF", "1")
 os.environ.setdefault("USE_TF", "0")
 
+import joblib
 import torch
 from transformers import (
     AutoModelForSequenceClassification,
@@ -19,6 +20,7 @@ from transformers import (
 
 LABEL_MAP = {0: "fake", 1: "real"}
 DEFAULT_TOKENIZER_NAME = "bert-base-uncased"
+SKLEARN_MODEL_FILENAME = "model.joblib"
 
 
 def load_tokenizer(model_dir: Path):
@@ -52,6 +54,7 @@ class LoadedModelBundle:
     model: object
     max_length: int
     model_name: str
+    backend: str
 
 
 def normalize_text(value: str | None) -> str:
@@ -87,6 +90,16 @@ def _load_model_bundle(model_dir_value: str) -> LoadedModelBundle:
     model_dir = _resolve_model_dir(Path(model_dir_value))
     training_config = _read_json(model_dir / "training_config.json")
 
+    sklearn_model_path = model_dir / SKLEARN_MODEL_FILENAME
+    if sklearn_model_path.exists():
+        return LoadedModelBundle(
+            tokenizer=None,
+            model=joblib.load(sklearn_model_path),
+            max_length=int(training_config.get("max_length", 0)),
+            model_name=str(training_config.get("model_name", sklearn_model_path.stem)),
+            backend="sklearn",
+        )
+
     tokenizer = load_tokenizer(model_dir)
     model = load_model(model_dir)
     model.to(torch.device("cpu"))
@@ -97,6 +110,7 @@ def _load_model_bundle(model_dir_value: str) -> LoadedModelBundle:
         model=model,
         max_length=int(training_config.get("max_length", 192)),
         model_name=str(training_config.get("model_name", model_dir.name)),
+        backend="transformers",
     )
 
 
@@ -136,6 +150,25 @@ def predict_text(model_dir: Path, text: str) -> dict:
         raise ValueError("Prediction text cannot be empty.")
 
     bundle = _load_model_bundle(str(_resolve_model_dir(model_dir)))
+    if bundle.backend == "sklearn":
+        probabilities = bundle.model.predict_proba([cleaned_text])[0]
+        class_to_probability = {int(label): float(probability) for label, probability in zip(bundle.model.classes_, probabilities)}
+        fake_score = class_to_probability.get(0, 0.0)
+        real_score = class_to_probability.get(1, 0.0)
+        predicted_label = 0 if fake_score >= real_score else 1
+        confidence = max(fake_score, real_score)
+        return {
+            "prediction": LABEL_MAP[predicted_label],
+            "predicted_label": predicted_label,
+            "confidence": float(confidence),
+            "model_name": bundle.model_name,
+            "text_length": len(cleaned_text),
+            "scores": {
+                "fake": float(fake_score),
+                "real": float(real_score),
+            },
+        }
+
     encoded = bundle.tokenizer(
         cleaned_text,
         truncation=True,

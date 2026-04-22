@@ -90,23 +90,56 @@ def compute_metrics(labels: list[int], predictions: list[int]) -> dict[str, floa
     }
 
 
+def summarize_confidence(
+    labels: list[int],
+    predictions: list[int],
+    confidences: list[float],
+) -> dict[str, float]:
+    confidence_array = np.array(confidences, dtype=float)
+    labels_array = np.array(labels, dtype=int)
+    predictions_array = np.array(predictions, dtype=int)
+    correct_mask = labels_array == predictions_array
+
+    summary = {
+        "average_confidence": float(confidence_array.mean()) if len(confidence_array) else 0.0,
+        "median_confidence": float(np.median(confidence_array)) if len(confidence_array) else 0.0,
+        "minimum_confidence": float(confidence_array.min()) if len(confidence_array) else 0.0,
+        "maximum_confidence": float(confidence_array.max()) if len(confidence_array) else 0.0,
+        "average_confidence_when_correct": 0.0,
+        "average_confidence_when_incorrect": 0.0,
+        "fake_prediction_rate": float((predictions_array == 0).mean()) if len(predictions_array) else 0.0,
+        "real_prediction_rate": float((predictions_array == 1).mean()) if len(predictions_array) else 0.0,
+    }
+
+    if correct_mask.any():
+        summary["average_confidence_when_correct"] = float(confidence_array[correct_mask].mean())
+    if (~correct_mask).any():
+        summary["average_confidence_when_incorrect"] = float(confidence_array[~correct_mask].mean())
+    return summary
+
+
 def evaluate_model(model, loader: DataLoader, device: torch.device) -> tuple[float, dict]:
     model.eval()
     total_loss = 0.0
     all_labels: list[int] = []
     all_predictions: list[int] = []
+    all_confidences: list[float] = []
 
     with torch.no_grad():
         for batch in loader:
             batch = {key: value.to(device) for key, value in batch.items()}
             outputs = model(**batch)
             total_loss += outputs.loss.item()
-            predictions = torch.argmax(outputs.logits, dim=1)
+            probabilities = torch.softmax(outputs.logits, dim=1)
+            predictions = torch.argmax(probabilities, dim=1)
+            confidences = torch.max(probabilities, dim=1).values
             all_labels.extend(batch["labels"].cpu().tolist())
             all_predictions.extend(predictions.cpu().tolist())
+            all_confidences.extend(confidences.cpu().tolist())
 
     average_loss = total_loss / max(len(loader), 1)
     metrics = compute_metrics(all_labels, all_predictions)
+    metrics["confidence"] = summarize_confidence(all_labels, all_predictions, all_confidences)
     metrics["loss"] = float(average_loss)
     return average_loss, metrics
 
