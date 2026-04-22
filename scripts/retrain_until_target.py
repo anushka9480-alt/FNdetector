@@ -201,15 +201,23 @@ def main() -> None:
 
     joblib.dump(best_bundle, output_dir / "model.joblib")
 
+    def to_portable_path(path_value: str) -> str:
+        path = Path(path_value)
+        try:
+            relative = path.resolve().relative_to(ROOT)
+        except Exception:
+            return str(path)
+        return relative.as_posix()
+
     training_config = {
         "model_name": "tfidf-logreg-fakenewsnet",
         "model_type": "sklearn_tfidf_logreg",
-        "train_file": str(args.train_file),
-        "validation_file": str(args.validation_file),
-        "test_file": str(args.test_file),
+        "train_file": to_portable_path(args.train_file),
+        "validation_file": to_portable_path(args.validation_file),
+        "test_file": to_portable_path(args.test_file),
         "text_column": "combined_text",
         "label_column": "label",
-        "output_dir": str(output_dir),
+        "output_dir": to_portable_path(str(output_dir)),
         "max_length": 0,
         "seed": args.seed,
         "target_accuracy": args.target_accuracy,

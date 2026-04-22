@@ -20,3 +20,4 @@ frontend/dist/
 dist/
 external/
 .vercel
+run_training_loop.py
