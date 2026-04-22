@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 
 from huggingface_hub import HfApi
+from huggingface_hub.errors import HfHubHTTPError
 
 from build_hf_space_bundle import OUTPUT_DIR, main as build_bundle
 
@@ -49,6 +50,17 @@ def main():
     build_bundle()
 
     api = HfApi(token=args.token)
+    try:
+        api.whoami()
+    except Exception as exc:
+        message = str(exc)
+        if "Invalid user token" in message or "401" in message:
+            raise SystemExit(
+                "HF_TOKEN appears invalid. Create a new Hugging Face write token and set it as HF_TOKEN "
+                "in the repo .env file (HF_TOKEN takes precedence over `hf auth login`)."
+            ) from exc
+        raise
+
     api.create_repo(
         repo_id=args.space_id,
         repo_type="space",
