@@ -1,0 +1,46 @@
+{
+  "device": "cpu",
+  "train_rows": 6000,
+  "validation_rows": 1000,
+  "test_rows": 1000,
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.20050582828745245,
+      "validation": {
+        "accuracy": 0.998,
+        "precision_fake": 0.9960159362549801,
+        "recall_fake": 1.0,
+        "f1_fake": 0.998003992015968,
+        "confusion_matrix": [
+          [
+            498,
+            2
+          ],
+          [
+            0,
+            500
+          ]
+        ],
+        "loss": 0.029691328946501016
+      }
+    }
+  ],
+  "test_metrics": {
+    "accuracy": 0.997,
+    "precision_fake": 0.9960079840319361,
+    "recall_fake": 0.998,
+    "f1_fake": 0.997002997002997,
+    "confusion_matrix": [
+      [
+        498,
+        2
+      ],
+      [
+        1,
+        499
+      ]
+    ],
+    "loss": 0.028739424705505372
+  }
+}
