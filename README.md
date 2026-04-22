@@ -1,6 +1,6 @@
 # FN Detector
 
-FN Detector is a fake-news detection project built for practical local training and browser-friendly deployment. It combines a lightweight transformer training pipeline, a FastAPI backend workflow for prediction and training jobs, and a Vite frontend that talks directly to the backend.
+FN Detector is a fake-news and deepfake screening project built for practical local training and browser-friendly deployment. It combines a lightweight transformer training pipeline, a compact image-artifact deepfake detector, a FastAPI backend workflow, and a Vite frontend that talks directly to the backend.
 
 ## Live deployment
 
@@ -13,8 +13,9 @@ FN Detector is a fake-news detection project built for practical local training 
 - Structured raw, processed, notebook, model, script, and source folders.
 - Automated dataset preparation for `smoke`, `quick`, and local `full` splits.
 - CPU-friendly transformer training with gradient accumulation.
+- Lightweight deepfake image detection using compact artifact features and a tiny linear model bundle.
 - Prediction helpers for CLI use and backend inference.
-- FastAPI backend endpoints for health, workflow, prediction, model metadata, and training jobs.
+- FastAPI backend endpoints for fake-news inference, deepfake image inference, health, workflow, model metadata, and training jobs.
 - Vite frontend under `frontend/` connected to the backend workflow.
 
 ## Project layout
@@ -56,6 +57,7 @@ Current shared variables:
 
 - `PORT`
 - `MODEL_DIR`
+- `DEEPFAKE_MODEL_DIR`
 - `CORS_ALLOW_ORIGINS`
 - `VITE_API_BASE_URL`
 - `HF_TOKEN`
@@ -108,9 +110,21 @@ Backend endpoints:
 - `GET /api/workflow`
 - `GET /api/model`
 - `POST /api/predict`
+- `GET /api/deepfake/health`
+- `GET /api/deepfake/metrics`
+- `POST /api/deepfake/predict`
 - `POST /api/train`
 - `GET /api/train/{job_id}`
 - `POST /api/prepare-data`
+
+The deployed Hugging Face backend also exposes root aliases for the prediction routes:
+
+- `GET /health`
+- `GET /metrics`
+- `POST /predict`
+- `GET /deepfake/health`
+- `GET /deepfake/metrics`
+- `POST /deepfake/predict`
 
 ## Run the frontend
 
@@ -160,6 +174,34 @@ This uploads a minimal backend package from `dist/hf_space_backend` with:
 - `GET /health`
 - `GET /metrics`
 - `POST /predict`
+- `GET /deepfake/health`
+- `GET /deepfake/metrics`
+- `POST /deepfake/predict`
+
+## Lightweight deepfake workflow
+
+The public `FaceForensics++` GitHub repo does not contain the full dataset itself. It provides the download tooling and split metadata, and the full dataset still requires approval through the official FaceForensics form.
+
+For this project, the deepfake path is intentionally kept small enough for an Intel `i7-8550U` laptop with `16 GB RAM`:
+
+- FaceForensics prep defaults to the lightest compression tier: `c40`
+- sampled micro dataset: `8` sequences and `4` frames per sequence
+- lightweight training cap: `32` images per label
+- inference target: image uploads, not full video pipelines
+
+Prepare a tiny FaceForensics-derived dataset after you have local access to the official download:
+
+```powershell
+python scripts\prepare_faceforensics_dataset.py --faceforensics-root C:\path\to\FaceForensics++ --compression c40 --videos 8 --frames-per-video 4
+```
+
+Train the lightweight deepfake bundle:
+
+```powershell
+python scripts\train_deepfake_model.py --dataset-dir data\deepfake\faceforensics_micro --max-images-per-label 32
+```
+
+For an immediate baseline, the training script also defaults to the tiny sample dataset included in the cloned `DeepFake-Detect` reference repo.
 
 ## Notes
 

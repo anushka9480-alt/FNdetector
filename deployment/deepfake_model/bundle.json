@@ -1,0 +1,105 @@
+{
+  "feature_names": [
+    "gray_mean",
+    "gray_std",
+    "laplacian_var",
+    "gradient_mean",
+    "gradient_std",
+    "high_frequency_ratio",
+    "blockiness",
+    "jpeg_residual_mean",
+    "jpeg_residual_std",
+    "mirror_difference",
+    "saturation_mean",
+    "saturation_std"
+  ],
+  "scaler": {
+    "mean": [
+      0.3894135057926178,
+      0.16643017530441284,
+      0.0016245938604697585,
+      0.01306572463363409,
+      0.0241470355540514,
+      0.30300813913345337,
+      1.007244348526001,
+      0.008029050193727016,
+      0.007909948006272316,
+      0.11933569610118866,
+      0.17327596247196198,
+      0.07436472177505493
+    ],
+    "scale": [
+      0.0831027701497078,
+      0.04393522068858147,
+      0.0009263058891519904,
+      0.004046801012009382,
+      0.006974863354116678,
+      0.03189605101943016,
+      0.08480057865381241,
+      0.001521392841823399,
+      0.0017849425785243511,
+      0.06415991485118866,
+      0.04083705693483353,
+      0.032066166400909424
+    ]
+  },
+  "model": {
+    "coefficients": [
+      -0.1552580323,
+      0.4495079971,
+      -0.1030570684,
+      0.6508357217,
+      -0.2056009272,
+      -0.4020637292,
+      -0.1068058709,
+      -0.3841619248,
+      -0.6691807026,
+      0.9157355483,
+      -1.0115699767,
+      0.3580950632
+    ],
+    "intercept": 0.0585737738
+  },
+  "training_summary": {
+    "status": "trained",
+    "model_name": "lightweight-deepfake-linear",
+    "dataset_dir": "C:\\Users\\harma\\OneDrive\\Desktop\\FN\\FNdetector\\external\\DeepFake-Detect\\prepared_dataset",
+    "dataset_rows": 22,
+    "train_rows": 16,
+    "test_rows": 6,
+    "max_images_per_label": 32,
+    "accuracy": 1.0,
+    "classification_report": {
+      "real": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 3.0
+      },
+      "fake": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 3.0
+      },
+      "accuracy": 1.0,
+      "macro avg": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 6.0
+      },
+      "weighted avg": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 6.0
+      }
+    },
+    "system_profile": {
+      "cpu": "Intel Core i7-8550U class",
+      "ram_gb": 16,
+      "recommended_reason": "Conservative cap to avoid memory spikes on laptop-class CPUs."
+    }
+  }
+}

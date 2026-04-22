@@ -22,6 +22,7 @@ def copy_source_code(output_dir: Path) -> None:
     destination = output_dir / "src" / "fake_news_detector"
     destination.mkdir(parents=True, exist_ok=True)
     copy2(ROOT / "src" / "fake_news_detector" / "__init__.py", destination / "__init__.py")
+    copy2(ROOT / "src" / "fake_news_detector" / "deepfake_detection.py", destination / "deepfake_detection.py")
     copy2(ROOT / "src" / "fake_news_detector" / "prediction.py", destination / "prediction.py")
 
 
@@ -30,6 +31,10 @@ def copy_model_bundle(output_dir: Path) -> None:
         ROOT / "deployment" / "model",
         output_dir / "deployment" / "model",
         ignore=ignore_patterns("onnx"),
+    )
+    copytree(
+        ROOT / "deployment" / "deepfake_model",
+        output_dir / "deployment" / "deepfake_model",
     )
 
 

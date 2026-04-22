@@ -2,7 +2,11 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 import json
+import os
 import re
+
+os.environ.setdefault("TRANSFORMERS_NO_TF", "1")
+os.environ.setdefault("USE_TF", "0")
 
 import torch
 from transformers import (

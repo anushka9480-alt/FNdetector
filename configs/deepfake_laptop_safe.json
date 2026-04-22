@@ -1,0 +1,17 @@
+{
+  "profile_name": "deepfake_laptop_safe",
+  "recommended_for": "Intel Core i7-8550U CPU with 16 GB RAM",
+  "dataset_root": "data/deepfake/faceforensics_micro",
+  "compression": "c40",
+  "method": "Deepfakes",
+  "videos": 8,
+  "frames_per_video": 4,
+  "max_images_per_label": 32,
+  "test_size": 0.25,
+  "seed": 42,
+  "notes": [
+    "Use the c40 split because it is the lightest FaceForensics compression tier.",
+    "Keep the micro dataset small enough to finish on CPU without large memory spikes.",
+    "Train the lightweight linear detector instead of the TensorFlow EfficientNet pipeline for local stability."
+  ]
+}

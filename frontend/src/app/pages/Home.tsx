@@ -13,7 +13,7 @@ const features = [
   {
     icon: <Zap className="w-8 h-8 text-blue-400" />,
     title: "Deepfake Recognition",
-    description: "Scan images and videos to detect unnatural artifacts and facial inconsistencies instantly.",
+    description: "Scan uploaded face images with the lightweight deepfake detector now wired into the backend.",
     link: "/deepfake",
   },
   {

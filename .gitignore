@@ -10,8 +10,13 @@ __pycache__/
 node_modules/
 models/
 data/
-deployment/
+deployment/*
+!deployment/model/
+!deployment/model/**
+!deployment/deepfake_model/
+!deployment/deepfake_model/**
 frontend/node_modules/
 frontend/dist/
 dist/
+external/
 .vercel
