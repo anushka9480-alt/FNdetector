@@ -1,0 +1,9 @@
+{
+  "name": "@fn-detector/web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "dependencies": {
+    "lucide-react": "^1.9.0"
+  }
+}

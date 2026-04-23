@@ -8,11 +8,17 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
+import torch
+from torchvision import models
 
 
-IMAGE_SIZE = 128
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
-FEATURE_NAMES = [
+DEFAULT_IMAGE_SIZE = 160
+VISION_FEATURE_NAMES = tuple(f"embedding_{index:04d}" for index in range(576))
+IMAGENET_MEAN = (0.485, 0.456, 0.406)
+IMAGENET_STD = (0.229, 0.224, 0.225)
+LEGACY_IMAGE_SIZE = 128
+LEGACY_FEATURE_NAMES = (
     "gray_mean",
     "gray_std",
     "laplacian_var",
@@ -25,17 +31,27 @@ FEATURE_NAMES = [
     "mirror_difference",
     "saturation_mean",
     "saturation_std",
-]
+)
 
 
 @dataclass(frozen=True)
 class DeepfakeModelBundle:
+    model_type: str
+    backbone_name: str
+    image_size: int
+    embedding_dim: int
     feature_names: tuple[str, ...]
-    mean: np.ndarray
-    scale: np.ndarray
-    coefficients: np.ndarray
-    intercept: float
+    scaler_mean: np.ndarray
+    scaler_scale: np.ndarray
+    classifier_weights: np.ndarray
+    classifier_bias: float
     training_summary: dict
+
+
+@dataclass(frozen=True)
+class LoadedBackbone:
+    model: torch.nn.Module
+    embedding_dim: int
 
 
 def _sigmoid(value: float) -> float:
@@ -56,13 +72,21 @@ def _load_image(source: bytes) -> Image.Image:
         raise ValueError("Image is too large. Please upload an image under 8 MB.")
     try:
         image = Image.open(io.BytesIO(source))
-    except Exception as exc:  # pragma: no cover - defensive for malformed uploads
+    except Exception as exc:  # pragma: no cover
         raise ValueError("Unable to decode the uploaded image.") from exc
     return image.convert("RGB")
 
 
-def _prepare_rgb_array(image: Image.Image) -> np.ndarray:
-    resized = image.resize((IMAGE_SIZE, IMAGE_SIZE), Image.Resampling.BILINEAR)
+def _preprocess_image(image: Image.Image, image_size: int) -> torch.Tensor:
+    resized = image.resize((image_size, image_size), Image.Resampling.BILINEAR)
+    rgb = np.asarray(resized, dtype=np.float32) / 255.0
+    rgb = (rgb - np.asarray(IMAGENET_MEAN, dtype=np.float32)) / np.asarray(IMAGENET_STD, dtype=np.float32)
+    tensor = torch.from_numpy(np.transpose(rgb, (2, 0, 1))).float()
+    return tensor
+
+
+def _prepare_legacy_rgb_array(image: Image.Image) -> np.ndarray:
+    resized = image.resize((LEGACY_IMAGE_SIZE, LEGACY_IMAGE_SIZE), Image.Resampling.BILINEAR)
     return np.asarray(resized, dtype=np.float32) / 255.0
 
 
@@ -102,9 +126,7 @@ def _compute_blockiness(gray: np.ndarray) -> float:
     horizontal_boundaries = gray[8::8, :] - gray[7:-1:8, :]
     all_vertical = np.diff(gray, axis=1)
     all_horizontal = np.diff(gray, axis=0)
-    boundary_energy = float(np.mean(np.abs(vertical_boundaries))) + float(
-        np.mean(np.abs(horizontal_boundaries))
-    )
+    boundary_energy = float(np.mean(np.abs(vertical_boundaries))) + float(np.mean(np.abs(horizontal_boundaries)))
     overall_energy = float(np.mean(np.abs(all_vertical))) + float(np.mean(np.abs(all_horizontal))) + 1e-8
     return boundary_energy / overall_energy
 
@@ -124,22 +146,17 @@ def _compute_saturation(rgb: np.ndarray) -> np.ndarray:
     return channel_max - channel_min
 
 
-def extract_feature_dict(image: Image.Image) -> dict[str, float]:
-    rgb = _prepare_rgb_array(image)
+def extract_legacy_feature_dict(image: Image.Image) -> dict[str, float]:
+    rgb = _prepare_legacy_rgb_array(image)
     rgb_uint8 = np.clip(np.round(rgb * 255.0), 0, 255).astype(np.uint8)
     gray = _compute_gray(rgb)
     laplacian = _compute_laplacian(gray)
-    gradients = np.concatenate(
-        [
-            np.abs(np.diff(gray, axis=0)).ravel(),
-            np.abs(np.diff(gray, axis=1)).ravel(),
-        ]
-    )
+    gradients = np.concatenate([np.abs(np.diff(gray, axis=0)).ravel(), np.abs(np.diff(gray, axis=1)).ravel()])
     saturation = _compute_saturation(rgb)
     mirrored = np.flip(rgb, axis=1)
     jpeg_mean, jpeg_std = _compute_jpeg_residual(rgb_uint8)
 
-    values = {
+    return {
         "gray_mean": float(gray.mean()),
         "gray_std": float(gray.std()),
         "laplacian_var": float(laplacian.var()),
@@ -153,20 +170,41 @@ def extract_feature_dict(image: Image.Image) -> dict[str, float]:
         "saturation_mean": float(saturation.mean()),
         "saturation_std": float(saturation.std()),
     }
-    return values
 
 
-def extract_feature_vector(image: Image.Image) -> np.ndarray:
-    feature_dict = extract_feature_dict(image)
-    return np.array([feature_dict[name] for name in FEATURE_NAMES], dtype=np.float32)
+def _create_backbone(backbone_name: str) -> LoadedBackbone:
+    if backbone_name != "mobilenet_v3_small":
+        raise ValueError(f"Unsupported deepfake backbone: {backbone_name}")
+
+    weights = models.MobileNet_V3_Small_Weights.DEFAULT
+    backbone = models.mobilenet_v3_small(weights=weights)
+    backbone.classifier = torch.nn.Identity()
+    backbone.eval()
+    for parameter in backbone.parameters():
+        parameter.requires_grad = False
+    return LoadedBackbone(model=backbone, embedding_dim=576)
+
+
+@lru_cache(maxsize=2)
+def load_backbone(backbone_name: str) -> LoadedBackbone:
+    torch.set_num_threads(max(1, min(4, (torch.get_num_threads() or 4))))
+    return _create_backbone(backbone_name)
+
+
+def extract_embedding(image: Image.Image, *, backbone_name: str, image_size: int) -> np.ndarray:
+    backbone = load_backbone(backbone_name)
+    tensor = _preprocess_image(image, image_size).unsqueeze(0)
+    with torch.no_grad():
+        embedding = backbone.model(tensor).squeeze(0).cpu().numpy().astype(np.float32)
+    return embedding
 
 
 def _default_training_summary(model_dir: Path) -> dict:
     return {
-        "status": "heuristic",
-        "model_name": "artifact-heuristic-baseline",
+        "status": "unavailable",
+        "model_name": "vision-backbone-unavailable",
         "model_dir": str(model_dir),
-        "notes": "No trained lightweight deepfake bundle was found, so the fallback heuristic is active.",
+        "notes": "No trained deepfake vision bundle was found.",
     }
 
 
@@ -178,12 +216,27 @@ def load_deepfake_bundle(model_dir_value: str) -> DeepfakeModelBundle | None:
         return None
 
     payload = json.loads(bundle_path.read_text(encoding="utf-8"))
+    model_payload = payload.get("model", {})
+    scaler_payload = payload.get("scaler", {})
+    feature_names = tuple(payload.get("feature_names", []))
+    if not feature_names:
+        feature_names = VISION_FEATURE_NAMES if model_payload.get("type") == "vision_linear_head" else LEGACY_FEATURE_NAMES
+    weights = model_payload.get("weights")
+    if weights is None:
+        weights = model_payload.get("coefficients", [])
+    bias = model_payload.get("bias")
+    if bias is None:
+        bias = model_payload.get("intercept", 0.0)
     return DeepfakeModelBundle(
-        feature_names=tuple(payload.get("feature_names", FEATURE_NAMES)),
-        mean=np.array(payload["scaler"]["mean"], dtype=np.float32),
-        scale=np.array(payload["scaler"]["scale"], dtype=np.float32),
-        coefficients=np.array(payload["model"]["coefficients"], dtype=np.float32),
-        intercept=float(payload["model"]["intercept"]),
+        model_type=str(model_payload.get("type", "vision_linear_head")),
+        backbone_name=str(model_payload.get("backbone_name", "mobilenet_v3_small")),
+        image_size=int(payload.get("image_size", DEFAULT_IMAGE_SIZE)),
+        embedding_dim=int(payload.get("embedding_dim", len(weights))),
+        feature_names=feature_names,
+        scaler_mean=np.array(scaler_payload.get("mean", []), dtype=np.float32),
+        scaler_scale=np.array(scaler_payload.get("scale", []), dtype=np.float32),
+        classifier_weights=np.array(weights, dtype=np.float32),
+        classifier_bias=float(bias),
         training_summary=payload.get("training_summary", {}),
     )
 
@@ -192,51 +245,43 @@ def get_deepfake_model_snapshot(model_dir: Path) -> dict:
     resolved = _resolve_model_dir(model_dir)
     bundle = load_deepfake_bundle(str(resolved))
     summary = bundle.training_summary if bundle else _default_training_summary(resolved)
+    feature_names = list(bundle.feature_names) if bundle else list(VISION_FEATURE_NAMES)
 
     return {
         "model_dir": str(resolved),
         "available": bundle is not None,
-        "feature_names": FEATURE_NAMES,
+        "feature_names": feature_names,
         "summary": summary,
     }
 
 
-def _heuristic_prediction(features: dict[str, float]) -> float:
-    raw_score = (
-        2.8 * features["jpeg_residual_mean"]
-        + 1.6 * features["high_frequency_ratio"]
-        + 0.7 * max(features["blockiness"] - 1.0, 0.0)
-        + 1.4 * features["mirror_difference"]
-        + 8.0 * features["laplacian_var"]
-        - 0.6 * features["saturation_mean"]
-    )
-    centered = (raw_score - 0.22) * 4.0
-    return min(max(_sigmoid(centered), 0.02), 0.98)
-
-
 def predict_deepfake_image(model_dir: Path, image_bytes: bytes, filename: str | None = None) -> dict:
-    image = _load_image(image_bytes)
-    features = extract_feature_dict(image)
-    vector = np.array([features[name] for name in FEATURE_NAMES], dtype=np.float32)
-
-    bundle = load_deepfake_bundle(str(_resolve_model_dir(model_dir)))
+    resolved_model_dir = _resolve_model_dir(model_dir)
+    bundle = load_deepfake_bundle(str(resolved_model_dir))
     if bundle is None:
-        fake_score = _heuristic_prediction(features)
-        model_name = "artifact-heuristic-baseline"
-        model_status = "heuristic"
-    else:
-        normalized = (vector - bundle.mean) / np.where(bundle.scale == 0, 1.0, bundle.scale)
-        logit = float(np.dot(normalized, bundle.coefficients) + bundle.intercept)
-        fake_score = _sigmoid(logit)
-        model_name = str(bundle.training_summary.get("model_name", "lightweight-deepfake-linear"))
-        model_status = "trained"
+        raise FileNotFoundError(f"No deepfake model bundle found in: {resolved_model_dir}")
 
+    image = _load_image(image_bytes)
+    if bundle.model_type == "vision_linear_head":
+        raw_vector = extract_embedding(
+            image,
+            backbone_name=bundle.backbone_name,
+            image_size=bundle.image_size,
+        )
+    else:
+        feature_dict = extract_legacy_feature_dict(image)
+        raw_vector = np.array([feature_dict[name] for name in bundle.feature_names], dtype=np.float32)
+
+    normalized = (raw_vector - bundle.scaler_mean) / np.where(bundle.scaler_scale == 0, 1.0, bundle.scaler_scale)
+    logit = float(np.dot(normalized, bundle.classifier_weights) + bundle.classifier_bias)
+    fake_score = _sigmoid(logit)
     real_score = 1.0 - fake_score
-    top_feature_names = sorted(
-        FEATURE_NAMES,
-        key=lambda feature_name: abs(features[feature_name]),
-        reverse=True,
-    )[:4]
+
+    top_indices = np.argsort(np.abs(normalized))[-4:][::-1]
+    top_signals = [
+        {"name": str(bundle.feature_names[int(index)]), "value": float(normalized[int(index)])}
+        for index in top_indices
+    ]
 
     return {
         "prediction": "fake" if fake_score >= 0.5 else "real",
@@ -245,13 +290,15 @@ def predict_deepfake_image(model_dir: Path, image_bytes: bytes, filename: str | 
             "fake": float(fake_score),
             "real": float(real_score),
         },
-        "model_name": model_name,
-        "model_status": model_status,
+        "model_name": str(bundle.training_summary.get("model_name", "mobilenet-v3-small-linear-head")),
+        "model_status": str(bundle.training_summary.get("status", "trained")),
+        "model_metrics": bundle.training_summary.get("test_metrics", {}),
         "filename": filename or "upload",
         "image_size": {"width": image.width, "height": image.height},
-        "features": features,
-        "top_signals": [
-            {"name": name, "value": float(features[name])}
-            for name in top_feature_names
-        ],
+        "features": {
+            "embedding_dim": int(bundle.embedding_dim),
+            "backbone": bundle.backbone_name if bundle.model_type == "vision_linear_head" else "legacy-artifact-features",
+            "input_size": int(bundle.image_size),
+        },
+        "top_signals": top_signals,
     }

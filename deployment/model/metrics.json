@@ -1,93 +1,93 @@
 {
   "device": "cpu",
-  "train_rows": 1855,
-  "validation_rows": 2320,
-  "test_rows": 2320,
+  "train_rows": 6000,
+  "validation_rows": 1000,
+  "test_rows": 1000,
   "history": [
     {
-      "increment": 1,
-      "train_fraction": 0.1,
-      "train_rows": 1855,
+      "epoch": 1,
+      "train_loss": 0.23609546788564573,
       "validation": {
-        "accuracy": 0.9413793103448276,
-        "precision_fake": 0.9057301293900185,
-        "recall_fake": 0.8521739130434782,
-        "f1_fake": 0.8781362007168458,
+        "accuracy": 0.998,
+        "precision_fake": 0.9960159362549801,
+        "recall_fake": 1.0,
+        "f1_fake": 0.998003992015968,
         "confusion_matrix": [
           [
-            490,
-            85
+            498,
+            2
           ],
           [
-            51,
-            1694
+            0,
+            500
           ]
         ],
-        "confidence": {
-          "average_confidence": 0.7481062849481898,
-          "median_confidence": 0.7635205886059986,
-          "minimum_confidence": 0.5001469686794485,
-          "maximum_confidence": 0.9852334841174488,
-          "average_confidence_when_correct": 0.7578536383348141,
-          "average_confidence_when_incorrect": 0.5915752570335745,
-          "fake_prediction_rate": 0.2331896551724138,
-          "real_prediction_rate": 0.7668103448275863
-        }
-      },
-      "test_metrics": {
-        "accuracy": 0.9375,
-        "precision_fake": 0.8882882882882883,
-        "recall_fake": 0.8559027777777778,
-        "f1_fake": 0.8717948717948718,
+        "loss": 0.01801594578847289
+      }
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.01231593506092516,
+      "validation": {
+        "accuracy": 0.999,
+        "precision_fake": 0.998003992015968,
+        "recall_fake": 1.0,
+        "f1_fake": 0.999000999000999,
         "confusion_matrix": [
           [
-            493,
-            83
+            499,
+            1
           ],
           [
-            62,
-            1682
+            0,
+            500
           ]
         ],
-        "confidence": {
-          "average_confidence": 0.7438891052872597,
-          "median_confidence": 0.7592306136582436,
-          "minimum_confidence": 0.5002407674649849,
-          "maximum_confidence": 0.9858657543777153,
-          "average_confidence_when_correct": 0.7546853970550014,
-          "average_confidence_when_incorrect": 0.5819447287711347,
-          "fake_prediction_rate": 0.23922413793103448,
-          "real_prediction_rate": 0.7607758620689655
-        }
+        "loss": 0.009049608653411268
+      }
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.006755457167824109,
+      "validation": {
+        "accuracy": 0.999,
+        "precision_fake": 0.998003992015968,
+        "recall_fake": 1.0,
+        "f1_fake": 0.999000999000999,
+        "confusion_matrix": [
+          [
+            499,
+            1
+          ],
+          [
+            0,
+            500
+          ]
+        ],
+        "loss": 0.008452425825875253
       }
     }
   ],
+  "calibration": {
+    "temperature": 0.8,
+    "threshold": 0.65,
+    "uncertainty_margin": 0.1
+  },
   "test_metrics": {
-    "accuracy": 0.9375,
-    "precision_fake": 0.8882882882882883,
-    "recall_fake": 0.8559027777777778,
-    "f1_fake": 0.8717948717948718,
+    "accuracy": 0.999,
+    "precision_fake": 1.0,
+    "recall_fake": 0.998,
+    "f1_fake": 0.998998998998999,
     "confusion_matrix": [
       [
-        493,
-        83
+        500,
+        0
       ],
       [
-        62,
-        1682
+        1,
+        499
       ]
     ],
-    "confidence": {
-      "average_confidence": 0.7438891052872597,
-      "median_confidence": 0.7592306136582436,
-      "minimum_confidence": 0.5002407674649849,
-      "maximum_confidence": 0.9858657543777153,
-      "average_confidence_when_correct": 0.7546853970550014,
-      "average_confidence_when_incorrect": 0.5819447287711347,
-      "fake_prediction_rate": 0.23922413793103448,
-      "real_prediction_rate": 0.7607758620689655
-    }
-  },
-  "best_increment": 1,
-  "best_train_fraction": 0.1
+    "loss": 0.007939318901393563
+  }
 }

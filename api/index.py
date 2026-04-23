@@ -139,6 +139,7 @@ def _news_predict(request: PredictionRequest) -> dict:
             "combined_length": len(combined_text),
         },
         "prediction": prediction,
+        "model_metrics": _news_metrics().get("report", {}).get("test_metrics", {}),
     }
 
 
@@ -198,7 +199,11 @@ def _deepfake_predict(filename: str, payload: bytes) -> dict:
     except Exception as exc:  # pragma: no cover - defensive for deployment only
         raise HTTPException(status_code=500, detail=f"Deepfake prediction failed: {exc}") from exc
 
-    return {"status": "ok", "prediction": prediction}
+    return {
+        "status": "ok",
+        "prediction": prediction,
+        "model_metrics": _deepfake_metrics().get("snapshot", {}).get("summary", {}).get("test_metrics", {}),
+    }
 
 
 @app.post("/deepfake/predict")

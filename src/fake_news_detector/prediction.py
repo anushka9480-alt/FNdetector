@@ -17,6 +17,8 @@ from transformers import (
     BertForSequenceClassification,
 )
 
+from fake_news_detector.fact_check import analyze_fact_check_signals
+
 
 LABEL_MAP = {0: "fake", 1: "real"}
 DEFAULT_TOKENIZER_NAME = "bert-base-uncased"
@@ -55,6 +57,9 @@ class LoadedModelBundle:
     max_length: int
     model_name: str
     backend: str
+    decision_threshold: float
+    uncertainty_margin: float
+    temperature: float
 
 
 def normalize_text(value: str | None) -> str:
@@ -89,6 +94,7 @@ def _read_json(path: Path) -> dict:
 def _load_model_bundle(model_dir_value: str) -> LoadedModelBundle:
     model_dir = _resolve_model_dir(Path(model_dir_value))
     training_config = _read_json(model_dir / "training_config.json")
+    metrics_report = _read_json(model_dir / "metrics.json")
 
     sklearn_model_path = model_dir / SKLEARN_MODEL_FILENAME
     if sklearn_model_path.exists():
@@ -98,6 +104,9 @@ def _load_model_bundle(model_dir_value: str) -> LoadedModelBundle:
             max_length=int(training_config.get("max_length", 0)),
             model_name=str(training_config.get("model_name", sklearn_model_path.stem)),
             backend="sklearn",
+            decision_threshold=float(training_config.get("decision_threshold", 0.5)),
+            uncertainty_margin=float(training_config.get("uncertainty_margin", 0.0)),
+            temperature=float(metrics_report.get("calibration", {}).get("temperature", 1.0)),
         )
 
     tokenizer = load_tokenizer(model_dir)
@@ -111,6 +120,9 @@ def _load_model_bundle(model_dir_value: str) -> LoadedModelBundle:
         max_length=int(training_config.get("max_length", 192)),
         model_name=str(training_config.get("model_name", model_dir.name)),
         backend="transformers",
+        decision_threshold=float(training_config.get("decision_threshold", 0.65)),
+        uncertainty_margin=float(training_config.get("uncertainty_margin", 0.1)),
+        temperature=float(metrics_report.get("calibration", {}).get("temperature", 1.0)),
     )
 
 
@@ -140,8 +152,38 @@ def get_model_snapshot(model_dir: Path) -> dict:
         "validation_rows": metrics_report.get("validation_rows"),
         "test_rows": metrics_report.get("test_rows"),
         "latest_epoch": latest_epoch,
+        "calibration": metrics_report.get("calibration", {}),
         "test_metrics": metrics_report.get("test_metrics", {}),
     }
+
+
+def apply_temperature_scaling(logits: torch.Tensor, temperature: float) -> torch.Tensor:
+    return logits / max(float(temperature), 1e-3)
+
+
+def choose_verdict(scores: dict[str, float], threshold: float, uncertainty_margin: float) -> str:
+    fake_score = float(scores["fake"])
+    real_score = float(scores["real"])
+
+    if fake_score >= threshold and (fake_score - real_score) >= uncertainty_margin:
+        return "fake"
+    if real_score >= threshold and (real_score - fake_score) >= uncertainty_margin:
+        return "real"
+    return "uncertain"
+
+
+def apply_fact_check_guardrails(verdict: str, fact_check_signals: dict) -> str:
+    if verdict != "real":
+        return verdict
+
+    high_risk = fact_check_signals.get("risk_level") == "high"
+    low_trust = fact_check_signals.get("source_signal") == "low_trust_cues"
+    weak_date_context = fact_check_signals.get("date_signal") in {"relative_date_only", "no_date_context"}
+    has_trusted_source = bool(fact_check_signals.get("trusted_mentions"))
+
+    if (high_risk or low_trust) and weak_date_context and not has_trusted_source:
+        return "uncertain"
+    return verdict
 
 
 def predict_text(model_dir: Path, text: str) -> dict:
@@ -152,7 +194,10 @@ def predict_text(model_dir: Path, text: str) -> dict:
     bundle = _load_model_bundle(str(_resolve_model_dir(model_dir)))
     if bundle.backend == "sklearn":
         probabilities = bundle.model.predict_proba([cleaned_text])[0]
-        class_to_probability = {int(label): float(probability) for label, probability in zip(bundle.model.classes_, probabilities)}
+        class_to_probability = {
+            int(label): float(probability)
+            for label, probability in zip(bundle.model.classes_, probabilities)
+        }
         fake_score = class_to_probability.get(0, 0.0)
         real_score = class_to_probability.get(1, 0.0)
         predicted_label = 0 if fake_score >= real_score else 1
@@ -179,18 +224,34 @@ def predict_text(model_dir: Path, text: str) -> dict:
 
     with torch.no_grad():
         outputs = bundle.model(**encoded)
-        probabilities = torch.softmax(outputs.logits, dim=1).squeeze(0)
+        scaled_logits = apply_temperature_scaling(outputs.logits, bundle.temperature)
+        probabilities = torch.softmax(scaled_logits, dim=1).squeeze(0)
 
     predicted_label = int(torch.argmax(probabilities).item())
     confidence = float(torch.max(probabilities).item())
+    scores = {
+        "fake": float(probabilities[0].item()),
+        "real": float(probabilities[1].item()),
+    }
+    verdict = choose_verdict(
+        scores=scores,
+        threshold=bundle.decision_threshold,
+        uncertainty_margin=bundle.uncertainty_margin,
+    )
+    fact_check_signals = analyze_fact_check_signals(cleaned_text)
+    verdict = apply_fact_check_guardrails(verdict, fact_check_signals)
     return {
-        "prediction": LABEL_MAP[predicted_label],
+        "prediction": verdict,
+        "model_label": LABEL_MAP[predicted_label],
         "predicted_label": predicted_label,
         "confidence": confidence,
         "model_name": bundle.model_name,
         "text_length": len(cleaned_text),
-        "scores": {
-            "fake": float(probabilities[0].item()),
-            "real": float(probabilities[1].item()),
+        "scores": scores,
+        "calibration": {
+            "temperature": bundle.temperature,
+            "threshold": bundle.decision_threshold,
+            "uncertainty_margin": bundle.uncertainty_margin,
         },
+        "fact_check_signals": fact_check_signals,
     }

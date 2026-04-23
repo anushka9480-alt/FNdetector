@@ -17,6 +17,8 @@ deployment/*
 !deployment/deepfake_model/**
 frontend/node_modules/
 frontend/dist/
+apps/**/node_modules/
+@/
 dist/
 external/
 .vercel

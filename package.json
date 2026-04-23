@@ -1,0 +1,8 @@
+{
+  "name": "fn-detector-workspace",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "packages/*"
+  ]
+}

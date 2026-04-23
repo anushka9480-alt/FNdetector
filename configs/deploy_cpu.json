@@ -10,7 +10,7 @@
   "train_batch_size": 2,
   "eval_batch_size": 2,
   "gradient_accumulation_steps": 8,
-  "num_epochs": 1,
+  "num_epochs": 3,
   "learning_rate": 2e-05,
   "weight_decay": 0.01,
   "warmup_ratio": 0.1,
@@ -18,5 +18,7 @@
   "num_workers": 0,
   "seed": 42,
   "device": "cpu",
-  "use_mixed_precision": false
+  "use_mixed_precision": false,
+  "decision_threshold": 0.65,
+  "uncertainty_margin": 0.1
 }

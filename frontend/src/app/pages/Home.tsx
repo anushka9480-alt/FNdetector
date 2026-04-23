@@ -1,220 +1,135 @@
-import { motion, useScroll, useTransform } from "motion/react";
-import { ArrowRight, ShieldCheck, Zap, Activity } from "lucide-react";
+import { ArrowRight, BarChart3, FileSearch, ImageIcon } from "lucide-react";
 import { Link } from "react-router";
-import { useRef } from "react";
 
-const features = [
+import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
+
+const tools = [
   {
-    icon: <ShieldCheck className="w-8 h-8 text-indigo-400" />,
-    title: "Fake News Detection",
-    description: "Run the local transformer-backed fake-news detector and inspect the active deployment model.",
-    link: "/fake-news",
+    title: "Fake News Detector",
+    description: "Paste article text, inspect calibrated scores, and review evaluation charts in one place.",
+    href: "/fake-news",
+    icon: FileSearch,
   },
   {
-    icon: <Zap className="w-8 h-8 text-blue-400" />,
-    title: "Deepfake Recognition",
-    description: "Scan uploaded face images with the lightweight deepfake detector now wired into the backend.",
-    link: "/deepfake",
+    title: "Deepfake Detector",
+    description: "Upload an image, inspect the verdict, and compare it against saved model statistics.",
+    href: "/deepfake",
+    icon: ImageIcon,
   },
   {
-    icon: <Activity className="w-8 h-8 text-emerald-400" />,
-    title: "Real-Time Tracking",
-    description: "Track backend health, model metrics, and the recommended smoke-to-full training sequence.",
-    link: "/how-it-works",
+    title: "Workflow Notes",
+    description: "See how training, validation, metrics, and deployment artifacts flow through the app.",
+    href: "/how-it-works",
+    icon: BarChart3,
   },
 ];
 
+const highlights = [
+  { label: "Text test accuracy", value: "99.9%" },
+  { label: "Detector surfaces", value: "2" },
+  { label: "Frontend direction", value: "Shadcn-first" },
+];
+
 export function Home() {
-  const heroRef = useRef(null);
-  const { scrollYProgress } = useScroll({
-    target: heroRef,
-    offset: ["start start", "end start"],
-  });
-
-  const yBackground = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
-  const opacityBackground = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
-  const scaleText = useTransform(scrollYProgress, [0, 1], [1, 0.8]);
-  const yText = useTransform(scrollYProgress, [0, 1], ["0%", "100%"]);
-
   return (
-    <div className="relative overflow-hidden w-full">
-      {/* Hero Section */}
-      <section ref={heroRef} className="relative h-[90vh] flex items-center justify-center overflow-hidden">
-        {/* Parallax Background */}
-        <motion.div
-          style={{ y: yBackground, opacity: opacityBackground }}
-          className="absolute inset-0 z-0"
-        >
-          <div className="absolute inset-0 bg-neutral-950/80 z-10" />
-          <img
-            src="https://images.unsplash.com/photo-1626447837522-a62b9f75a5dd?auto=format&fit=crop&q=80"
-            alt="Hero Background"
-            className="w-full h-full object-cover object-center scale-110"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-900/50 to-transparent z-10" />
-        </motion.div>
-
-        {/* Hero Content */}
-        <motion.div
-          style={{ scale: scaleText, y: yText }}
-          className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mt-[-10vh]"
-        >
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, ease: "easeOut" }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 mb-8"
-          >
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
-            </span>
-            Protecting truth in the digital era
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
-            className="text-6xl md:text-8xl font-extrabold tracking-tight text-white mb-6"
-          >
-            Truth, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Verified.</span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.4, ease: "easeOut" }}
-            className="text-xl md:text-2xl text-neutral-300 max-w-3xl mx-auto mb-10 leading-relaxed"
-          >
-            Advanced AI models designed to detect fake news before it spreads. The frontend now connects directly to the backend workflow for prediction, training, and model monitoring.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.6, ease: "easeOut" }}
-            className="flex flex-col sm:flex-row gap-4 justify-center items-center"
-          >
-            <Link to="/fake-news">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="px-8 py-4 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-lg flex items-center gap-2 transition-colors shadow-[0_0_40px_-10px_rgba(79,70,229,0.5)]"
-              >
-                Start Detecting
-                <ArrowRight className="w-5 h-5" />
-              </motion.button>
-            </Link>
-            <Link to="/how-it-works">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="px-8 py-4 rounded-full bg-neutral-800 hover:bg-neutral-700 text-white font-semibold text-lg transition-colors border border-neutral-700 hover:border-neutral-600"
-              >
-                Learn How It Works
-              </motion.button>
-            </Link>
-          </motion.div>
-        </motion.div>
-      </section>
-
-      {/* Features Section */}
-      <section className="relative z-30 py-32 bg-neutral-950">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.8 }}
-            className="text-center mb-20"
-          >
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">Cutting-Edge Detection</h2>
-            <p className="text-xl text-neutral-400 max-w-2xl mx-auto">
-              Equip yourself with the tools to spot disinformation, altered media, and propaganda effortlessly.
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {features.map((feature, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-100px" }}
-                transition={{ duration: 0.6, delay: i * 0.2 }}
-                whileHover={{ y: -10 }}
-                className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 hover:bg-neutral-800/80 transition-colors group"
-              >
-                <div className="bg-neutral-950 w-16 h-16 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 border border-neutral-800">
-                  {feature.icon}
+    <div className="mx-auto flex min-h-[calc(100vh-73px)] max-w-7xl flex-col gap-10 px-4 py-10 sm:px-6 lg:px-8">
+      <section className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+        <Card className="rounded-3xl border-border/80 bg-card/80">
+          <CardHeader className="gap-4">
+            <Badge variant="secondary" className="rounded-full px-3 py-1">
+              Component-led interface
+            </Badge>
+            <div className="space-y-4">
+              <CardTitle className="text-4xl font-semibold tracking-tight md:text-5xl">
+                A quieter workspace for fake-news and deepfake screening.
+              </CardTitle>
+              <CardDescription className="max-w-2xl text-base leading-7 text-muted-foreground">
+                The interface now leans on the shadcn component system and its preset color tokens,
+                with less visual noise and more emphasis on cards, forms, metrics, and readable results.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="grid gap-4 sm:grid-cols-3">
+              {highlights.map((item) => (
+                <div key={item.label} className="rounded-2xl border border-border bg-background px-4 py-4">
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                    {item.label}
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold tracking-tight">{item.value}</p>
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-4">{feature.title}</h3>
-                <p className="text-neutral-400 mb-8 leading-relaxed">
-                  {feature.description}
-                </p>
-                <Link to={feature.link} className="inline-flex items-center text-indigo-400 font-medium hover:text-indigo-300 transition-colors group/link">
-                  Explore tool 
-                  <ArrowRight className="w-4 h-4 ml-2 group-hover/link:translate-x-1 transition-transform" />
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button asChild size="lg" className="rounded-full px-6">
+                <Link to="/fake-news">
+                  Open fake-news detector
+                  <ArrowRight className="size-4" />
                 </Link>
-              </motion.div>
-            ))}
-          </div>
-        </div>
+              </Button>
+              <Button asChild variant="outline" size="lg" className="rounded-full px-6">
+                <Link to="/deepfake">Open deepfake detector</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border-border/80 bg-primary text-primary-foreground">
+          <CardHeader>
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-primary-foreground/10 p-2">
+              <img src="/logo.svg" alt="FN Detector logo" className="size-full object-contain brightness-0 invert" />
+            </div>
+            <CardTitle className="text-2xl font-semibold">Theme direction</CardTitle>
+            <CardDescription className="text-primary-foreground/75">
+              The preset introduced a fresh component palette, and the frontend now uses those
+              colors as the main visual language instead of custom neon accents.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm leading-6 text-primary-foreground/85">
+            <p>Soft surfaces instead of full-screen hero sections.</p>
+            <p>Neutral spacing with the green preset color reserved for focus and action.</p>
+            <p>Cards, badges, and buttons carry the brand more than backgrounds do.</p>
+          </CardContent>
+        </Card>
       </section>
-      
-      {/* Stats Parallax Section */}
-      <StatsParallax />
+
+      <section className="grid gap-6 md:grid-cols-3">
+        {tools.map((tool) => {
+          const Icon = tool.icon;
+          return (
+            <Card key={tool.title} className="rounded-3xl border-border/80 bg-card/80">
+              <CardHeader className="gap-4">
+                <div className="flex size-11 items-center justify-center rounded-2xl border border-border bg-background">
+                  <Icon className="size-5 text-primary" />
+                </div>
+                <div className="space-y-2">
+                  <CardTitle className="text-xl font-semibold">{tool.title}</CardTitle>
+                  <CardDescription className="text-sm leading-6">
+                    {tool.description}
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardFooter>
+                <Button asChild variant="ghost" className="px-0 text-primary hover:bg-transparent">
+                  <Link to={tool.href}>
+                    Open section
+                    <ArrowRight className="size-4" />
+                  </Link>
+                </Button>
+              </CardFooter>
+            </Card>
+          );
+        })}
+      </section>
     </div>
-  );
-}
-
-function StatsParallax() {
-  const ref = useRef(null);
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start end", "end start"],
-  });
-
-  const y = useTransform(scrollYProgress, [0, 1], ["20%", "-20%"]);
-
-  return (
-    <section ref={ref} className="relative h-[60vh] overflow-hidden flex items-center justify-center">
-      <motion.div style={{ y }} className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-indigo-900/40 mix-blend-multiply z-10" />
-        <img
-          src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80"
-          alt="Parallax background"
-          className="w-full h-[150%] object-cover object-center scale-110"
-        />
-        <div className="absolute inset-0 bg-neutral-950/80 z-10" />
-      </motion.div>
-
-      <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
-          {[
-            { value: "99.8%", label: "Detection Accuracy" },
-            { value: "10M+", label: "Articles Scanned Daily" },
-            { value: "0.2s", label: "Average Response Time" },
-          ].map((stat, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, scale: 0.5 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8, delay: i * 0.2, type: "spring", bounce: 0.4 }}
-              className="flex flex-col items-center justify-center"
-            >
-              <div className="text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white to-indigo-300 mb-4 drop-shadow-lg">
-                {stat.value}
-              </div>
-              <div className="text-xl text-indigo-200 font-medium tracking-wide uppercase">
-                {stat.label}
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </section>
   );
 }

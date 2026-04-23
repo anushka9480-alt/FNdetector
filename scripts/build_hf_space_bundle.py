@@ -23,6 +23,7 @@ def copy_source_code(output_dir: Path) -> None:
     destination.mkdir(parents=True, exist_ok=True)
     copy2(ROOT / "src" / "fake_news_detector" / "__init__.py", destination / "__init__.py")
     copy2(ROOT / "src" / "fake_news_detector" / "deepfake_detection.py", destination / "deepfake_detection.py")
+    copy2(ROOT / "src" / "fake_news_detector" / "fact_check.py", destination / "fact_check.py")
     copy2(ROOT / "src" / "fake_news_detector" / "prediction.py", destination / "prediction.py")
 
 

@@ -1,5 +1,5 @@
-import re
 from pathlib import Path
+import re
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -25,6 +25,43 @@ def build_combined_text(title: str, text: str) -> str:
     return title or text
 
 
+def normalize_raw_dataset(
+    combined: pd.DataFrame,
+    *,
+    title_column: str = "title",
+    text_column: str = "text",
+    label_column: str = "label",
+    label_mapping: dict[int, str] | None = None,
+) -> pd.DataFrame:
+    combined = combined.copy()
+    combined.columns = [str(c).lower() for c in combined.columns]
+
+    title_column = title_column.lower()
+    text_column = text_column.lower()
+    label_column = label_column.lower()
+    label_mapping = label_mapping or {0: "fake", 1: "real"}
+
+    if label_column not in combined.columns:
+        raise KeyError(f"Missing required label column: {label_column}")
+
+    combined["label"] = pd.to_numeric(combined[label_column], errors="coerce")
+    combined = combined.loc[combined["label"].notna()].copy()
+    combined["label"] = combined["label"].astype(int)
+    combined = combined.loc[combined["label"].isin(label_mapping)].copy()
+    combined["label_name"] = combined["label"].map(label_mapping)
+
+    combined["title"] = combined.get(title_column, pd.Series([""] * len(combined))).fillna("").map(normalize_text)
+    combined["text"] = combined.get(text_column, pd.Series([""] * len(combined))).fillna("").map(normalize_text)
+    combined["combined_text"] = [
+        build_combined_text(title, text)
+        for title, text in zip(combined["title"], combined["text"])
+    ]
+
+    combined = combined.loc[combined["combined_text"].str.len() > 0].copy()
+    combined = combined[["title", "text", "combined_text", "label", "label_name"]].reset_index(drop=True)
+    return combined
+
+
 def _infer_schema(frame: pd.DataFrame) -> pd.DataFrame:
     normalized = frame.copy()
     normalized.columns = [str(c).lower() for c in normalized.columns]
@@ -48,10 +85,7 @@ def _infer_schema(frame: pd.DataFrame) -> pd.DataFrame:
     if "label" in normalized:
         label_series = pd.to_numeric(normalized["label"], errors="coerce")
     elif "real" in normalized:
-        real_series = pd.to_numeric(normalized["real"], errors="coerce")
-        # Preserve the repository-wide label convention used by prediction.py:
-        # 0 = fake, 1 = real.
-        label_series = real_series
+        label_series = pd.to_numeric(normalized["real"], errors="coerce")
     else:
         raise ValueError(
             "Unsupported dataset schema. Expected either 'label' or 'real' column in the source data."
@@ -64,26 +98,29 @@ def _infer_schema(frame: pd.DataFrame) -> pd.DataFrame:
             "label": label_series,
         }
     )
-    prepared = prepared.dropna(subset=["label"]).copy()
-    prepared["label"] = prepared["label"].astype(int)
-    prepared = prepared.loc[prepared["label"].isin([0, 1])].copy()
-    prepared["label_name"] = prepared["label"].map({0: "fake", 1: "real"})
-    prepared["combined_text"] = [
-        build_combined_text(title, text)
-        for title, text in zip(prepared["title"], prepared["text"])
-    ]
-    prepared = prepared.loc[prepared["combined_text"].str.len() > 0].copy()
-    return prepared[["title", "text", "combined_text", "label", "label_name"]].reset_index(drop=True)
-
-
-def load_raw_dataset(dataset_path: Path) -> pd.DataFrame:
-    combined = pd.read_csv(dataset_path)
-    return _infer_schema(combined)
+    return normalize_raw_dataset(prepared)
 
 
 def load_huggingface_dataset_csv(dataset_csv_url: str = DEFAULT_HF_DATASET_CSV_URL) -> pd.DataFrame:
     combined = pd.read_csv(dataset_csv_url)
     return _infer_schema(combined)
+
+
+def load_raw_dataset(
+    dataset_path: Path,
+    *,
+    title_column: str = "title",
+    text_column: str = "text",
+    label_column: str = "label",
+    label_mapping: dict[int, str] | None = None,
+) -> pd.DataFrame:
+    return normalize_raw_dataset(
+        pd.read_csv(dataset_path),
+        title_column=title_column,
+        text_column=text_column,
+        label_column=label_column,
+        label_mapping=label_mapping,
+    )
 
 
 def create_full_splits(dataset: pd.DataFrame, seed: int = 42) -> dict[str, pd.DataFrame]:
@@ -123,8 +160,7 @@ def create_quick_splits(
             pieces.append(part.sample(n=min(len(part), per_label), random_state=seed))
 
         sampled = pd.concat(pieces, ignore_index=True).sample(frac=1.0, random_state=seed)
-        sampled = sampled.reset_index(drop=True)
-        quick_splits[split_name] = sampled
+        quick_splits[split_name] = sampled.reset_index(drop=True)
 
     return quick_splits
 

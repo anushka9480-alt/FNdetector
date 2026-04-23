@@ -10,14 +10,33 @@ import {
   ScanFace,
   ShieldAlert,
   Sparkles,
+  Target,
   UploadCloud,
 } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, XAxis, YAxis } from "recharts";
+
+import {
+  ChartContainer,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "../components/ui/chart";
+
+type MetricSet = {
+  accuracy?: number;
+  precision_fake?: number;
+  recall_fake?: number;
+  f1_fake?: number;
+  avg_confidence?: number;
+  confusion_matrix?: number[][];
+};
 
 type DeepfakePredictionResponse = {
   prediction: "real" | "fake";
   confidence: number;
   model_name: string;
   model_status: string;
+  model_metrics?: MetricSet;
   scores: {
     real: number;
     fake: number;
@@ -41,15 +60,48 @@ type DeepfakeMetricsResponse = {
       status?: string;
       model_name?: string;
       accuracy?: number;
+      avg_confidence?: number;
+      precision_fake?: number;
+      recall_fake?: number;
+      f1_fake?: number;
       dataset_rows?: number;
+      train_rows?: number;
+      validation_rows?: number;
+      test_rows?: number;
       max_images_per_label?: number;
+      best_epoch?: number;
+      target_reached?: boolean;
+      history?: Array<{
+        epoch: number;
+        train?: MetricSet;
+        validation?: MetricSet;
+      }>;
+      test_metrics?: MetricSet;
     };
   };
 };
 
+const performanceChartConfig = {
+  accuracy: { label: "Accuracy", color: "#22d3ee" },
+  precision: { label: "Precision", color: "#fb7185" },
+  recall: { label: "Recall", color: "#f59e0b" },
+  f1: { label: "F1", color: "#34d399" },
+  confidence: { label: "Confidence", color: "#a78bfa" },
+};
+
+const historyChartConfig = {
+  validationAccuracy: { label: "Validation Accuracy", color: "#22d3ee" },
+  validationF1: { label: "Validation F1", color: "#34d399" },
+  validationConfidence: { label: "Validation Confidence", color: "#a78bfa" },
+};
+
+function formatPercent(value?: number) {
+  return `${Math.round((value ?? 0) * 100)}%`;
+}
+
 export function Deepfake() {
   const reduceMotion = useReducedMotion();
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "https://Harman823-fndetector-backend.hf.space";
 
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
@@ -95,7 +147,7 @@ export function Deepfake() {
     }
 
     if (!nextFile.type.startsWith("image/")) {
-      setError("This lightweight detector currently accepts images only. Upload a JPG, PNG, or WEBP file.");
+      setError("This detector currently accepts image files only. Upload a JPG, PNG, or WEBP file.");
       setStatus("idle");
       setFile(null);
       setResult(null);
@@ -118,11 +170,11 @@ export function Deepfake() {
       });
 
       const payload = await response.json();
-      if (!response.ok) {
+      if (!response.ok || !payload.prediction) {
         throw new Error(payload.detail ?? "Deepfake prediction failed.");
       }
 
-      setResult(payload.prediction);
+      setResult(payload.prediction as DeepfakePredictionResponse);
       setStatus("result");
     } catch (requestError) {
       const message =
@@ -147,11 +199,35 @@ export function Deepfake() {
   const isFake = result?.prediction === "fake";
   const verdictTitle = isFake ? "Synthetic Signals Detected" : "Looks More Natural";
   const verdictCopy = isFake
-    ? "The lightweight detector found artifact patterns that lean toward manipulation. Treat this as a screening result, not a final forensic verdict."
-    : "The uploaded image looks closer to the real class under this lightweight detector, though manual verification still matters for high-stakes use.";
+    ? "The detector found artifact patterns that lean toward manipulation. Treat this as a screening result, not a final forensic verdict."
+    : "The uploaded image looks closer to the real class under this detector, though manual verification still matters for high-stakes use.";
+
+  const evaluationMetrics = result?.model_metrics ?? metrics?.snapshot.summary.test_metrics ?? {
+    accuracy: metrics?.snapshot.summary.accuracy,
+    avg_confidence: metrics?.snapshot.summary.avg_confidence,
+    precision_fake: metrics?.snapshot.summary.precision_fake,
+    recall_fake: metrics?.snapshot.summary.recall_fake,
+    f1_fake: metrics?.snapshot.summary.f1_fake,
+  };
+  const performanceData = evaluationMetrics
+    ? [
+        evaluationMetrics.accuracy !== undefined ? { key: "accuracy", label: "Accuracy", value: Number((evaluationMetrics.accuracy * 100).toFixed(1)) } : null,
+        evaluationMetrics.precision_fake !== undefined ? { key: "precision", label: "Precision", value: Number((evaluationMetrics.precision_fake * 100).toFixed(1)) } : null,
+        evaluationMetrics.recall_fake !== undefined ? { key: "recall", label: "Recall", value: Number((evaluationMetrics.recall_fake * 100).toFixed(1)) } : null,
+        evaluationMetrics.f1_fake !== undefined ? { key: "f1", label: "F1", value: Number((evaluationMetrics.f1_fake * 100).toFixed(1)) } : null,
+        evaluationMetrics.avg_confidence !== undefined ? { key: "confidence", label: "Confidence", value: Number((evaluationMetrics.avg_confidence * 100).toFixed(1)) } : null,
+      ].filter(Boolean) as Array<{ key: string; label: string; value: number }>
+    : [];
+  const historyData = (metrics?.snapshot.summary.history ?? []).map((entry) => ({
+    epoch: `E${entry.epoch}`,
+    validationAccuracy: Number(((entry.validation?.accuracy ?? 0) * 100).toFixed(1)),
+    validationF1: Number(((entry.validation?.f1_fake ?? 0) * 100).toFixed(1)),
+    validationConfidence: Number(((entry.validation?.avg_confidence ?? 0) * 100).toFixed(1)),
+  }));
+  const confusionMatrix = evaluationMetrics?.confusion_matrix ?? [[0, 0], [0, 0]];
 
   return (
-    <div className="min-h-screen pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto flex flex-col items-center">
+    <div className="min-h-screen pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto flex flex-col items-center">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -163,7 +239,7 @@ export function Deepfake() {
           Deepfake Detector
         </h1>
         <p className="text-xl text-neutral-400 max-w-3xl mx-auto">
-          Upload a face image and run the lightweight detector now connected to the backend. It uses a compact artifact model tuned for laptop-class CPU workflows and low deployment memory usage.
+          Upload an image, inspect the synthetic-vs-natural verdict, and review evaluation metrics and training curves from the deployed detector bundle.
         </p>
       </motion.div>
 
@@ -192,9 +268,7 @@ export function Deepfake() {
               <UploadCloud className="w-24 h-24 text-neutral-600 group-hover:text-cyan-400 transition-colors mx-auto mb-8" />
 
               <h3 className="text-3xl font-bold text-white mb-4">Drop in an image to analyze</h3>
-              <p className="text-neutral-500 text-lg mb-8">
-                or click to browse your files (JPG, PNG, WEBP)
-              </p>
+              <p className="text-neutral-500 text-lg mb-8">or click to browse your files (JPG, PNG, WEBP)</p>
 
               <div className="flex justify-center gap-4 flex-wrap">
                 <div className="flex items-center gap-2 text-neutral-400 bg-neutral-950 px-4 py-2 rounded-xl border border-neutral-800">
@@ -311,9 +385,7 @@ export function Deepfake() {
                   <div>
                     <div className="flex justify-between mb-2">
                       <span className="text-neutral-300 font-medium">Synthetic Probability</span>
-                      <span className={`font-bold ${isFake ? "text-red-400" : "text-emerald-400"}`}>
-                        {fakePercent}%
-                      </span>
+                      <span className={`font-bold ${isFake ? "text-red-400" : "text-emerald-400"}`}>{fakePercent}%</span>
                     </div>
                     <div className="w-full bg-neutral-950 h-3 rounded-full overflow-hidden">
                       <motion.div
@@ -341,10 +413,14 @@ export function Deepfake() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
                   <div className="rounded-2xl bg-neutral-950/80 border border-neutral-800 p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 mb-2">Confidence</p>
                     <p className="text-2xl font-black text-white">{Math.round(result.confidence * 100)}%</p>
+                  </div>
+                  <div className="rounded-2xl bg-neutral-950/80 border border-neutral-800 p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 mb-2">Model Accuracy</p>
+                    <p className="text-2xl font-black text-white">{formatPercent(evaluationMetrics?.accuracy)}</p>
                   </div>
                   <div className="rounded-2xl bg-neutral-950/80 border border-neutral-800 p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 mb-2">Model</p>
@@ -355,9 +431,79 @@ export function Deepfake() {
                     <p className="text-lg font-bold text-white capitalize">{result.model_status}</p>
                   </div>
                 </div>
+              </div>
 
-                <div className="mt-8">
-                  <p className="text-sm uppercase tracking-[0.2em] text-neutral-500 mb-3">Top Signals</p>
+              <div className="grid grid-cols-1 2xl:grid-cols-[0.95fr_1.05fr] gap-6">
+                <div className="rounded-3xl border border-neutral-800 bg-neutral-900 p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <Target className="w-5 h-5 text-cyan-400" />
+                    <h3 className="text-xl font-bold text-white">Model Statistics</h3>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    {performanceData.map((item) => (
+                      <div key={item.key} className="rounded-2xl border border-neutral-800 bg-neutral-950/80 p-4">
+                        <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">{item.label}</p>
+                        <p className="text-2xl font-black text-white mt-2">{item.value}%</p>
+                      </div>
+                    ))}
+                  </div>
+                  <ChartContainer config={performanceChartConfig} className="mt-6 h-[280px] w-full">
+                    <BarChart data={performanceData}>
+                      <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                      <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                      <YAxis domain={[0, 100]} tickLine={false} axisLine={false} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar dataKey="value" radius={[12, 12, 0, 0]}>
+                        {performanceData.map((item) => (
+                          <Cell key={item.key} fill={`var(--color-${item.key})`} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ChartContainer>
+                </div>
+
+                <div className="rounded-3xl border border-neutral-800 bg-neutral-900 p-6">
+                  <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 mb-3">Training Trend</p>
+                  <ChartContainer config={historyChartConfig} className="h-[320px] w-full">
+                    <LineChart data={historyData}>
+                      <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                      <XAxis dataKey="epoch" tickLine={false} axisLine={false} />
+                      <YAxis domain={[0, 100]} tickLine={false} axisLine={false} />
+                      <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
+                      <Legend content={<ChartLegendContent />} />
+                      <Line type="monotone" dataKey="validationAccuracy" stroke="var(--color-validationAccuracy)" strokeWidth={3} dot={false} />
+                      <Line type="monotone" dataKey="validationF1" stroke="var(--color-validationF1)" strokeWidth={3} dot={false} />
+                      <Line type="monotone" dataKey="validationConfidence" stroke="var(--color-validationConfidence)" strokeWidth={3} dot={false} />
+                    </LineChart>
+                  </ChartContainer>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 2xl:grid-cols-[0.95fr_1.05fr] gap-6">
+                <div className="rounded-3xl border border-neutral-800 bg-neutral-900 p-6">
+                  <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 mb-3">Confusion Matrix</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl border border-neutral-800 bg-neutral-950/80 p-4">
+                      <p className="text-sm text-neutral-500">True Real -&gt; Pred Real</p>
+                      <p className="text-3xl font-black text-white mt-2">{confusionMatrix[0]?.[0] ?? 0}</p>
+                    </div>
+                    <div className="rounded-2xl border border-neutral-800 bg-neutral-950/80 p-4">
+                      <p className="text-sm text-neutral-500">True Real -&gt; Pred Fake</p>
+                      <p className="text-3xl font-black text-white mt-2">{confusionMatrix[0]?.[1] ?? 0}</p>
+                    </div>
+                    <div className="rounded-2xl border border-neutral-800 bg-neutral-950/80 p-4">
+                      <p className="text-sm text-neutral-500">True Fake -&gt; Pred Real</p>
+                      <p className="text-3xl font-black text-white mt-2">{confusionMatrix[1]?.[0] ?? 0}</p>
+                    </div>
+                    <div className="rounded-2xl border border-neutral-800 bg-neutral-950/80 p-4">
+                      <p className="text-sm text-neutral-500">True Fake -&gt; Pred Fake</p>
+                      <p className="text-3xl font-black text-white mt-2">{confusionMatrix[1]?.[1] ?? 0}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-neutral-800 bg-neutral-900 p-6">
+                  <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 mb-3">Top Signals</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {result.top_signals.map((signal) => (
                       <div key={signal.name} className="rounded-2xl border border-neutral-800 bg-neutral-950/70 p-4">
@@ -367,17 +513,17 @@ export function Deepfake() {
                     ))}
                   </div>
                 </div>
-
-                <motion.button
-                  whileHover={reduceMotion ? undefined : { scale: 1.03 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={reset}
-                  className="w-full mt-8 py-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold transition-colors border border-neutral-700 flex items-center justify-center gap-2"
-                >
-                  <Camera className="w-5 h-5" />
-                  Scan Another File
-                </motion.button>
               </div>
+
+              <motion.button
+                whileHover={reduceMotion ? undefined : { scale: 1.03 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={reset}
+                className="w-fit py-4 px-6 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold transition-colors border border-neutral-700 flex items-center justify-center gap-2"
+              >
+                <Camera className="w-5 h-5" />
+                Scan Another File
+              </motion.button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -391,7 +537,7 @@ export function Deepfake() {
           <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6">
             <h3 className="text-xl font-bold text-white mb-4">Detector Profile</h3>
             <p className="text-neutral-400 mb-5">
-              This path is intentionally lightweight for your deployed stack. It uses compact image artifact features instead of a heavy video backbone, which keeps CPU and memory usage much lower.
+              This route now uses a real vision backbone and exposes held-out evaluation statistics instead of only a raw synthetic score.
             </p>
             <div className="space-y-3">
               <div className="rounded-2xl bg-neutral-950 border border-neutral-800 p-4">
@@ -400,9 +546,7 @@ export function Deepfake() {
               </div>
               <div className="rounded-2xl bg-neutral-950 border border-neutral-800 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 mb-2">Model</p>
-                <p className="font-semibold text-white">
-                  {metrics?.snapshot.summary.model_name ?? "lightweight-deepfake-linear"}
-                </p>
+                <p className="font-semibold text-white">{metrics?.snapshot.summary.model_name ?? "lightweight-deepfake-linear"}</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-2xl bg-neutral-950 border border-neutral-800 p-4">
@@ -413,6 +557,16 @@ export function Deepfake() {
                   <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 mb-2">Samples</p>
                   <p className="text-2xl font-black text-white">{metrics?.snapshot.summary.dataset_rows ?? "--"}</p>
                 </div>
+                <div className="rounded-2xl bg-neutral-950 border border-neutral-800 p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 mb-2">Best Epoch</p>
+                  <p className="text-2xl font-black text-white">{metrics?.snapshot.summary.best_epoch ?? "--"}</p>
+                </div>
+                <div className="rounded-2xl bg-neutral-950 border border-neutral-800 p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 mb-2">Target Gate</p>
+                  <p className={`text-sm font-bold ${metrics?.snapshot.summary.target_reached ? "text-emerald-400" : "text-amber-400"}`}>
+                    {metrics?.snapshot.summary.target_reached ? "Reached" : "Not reached"}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -422,24 +576,22 @@ export function Deepfake() {
             <div className="space-y-3 text-neutral-300">
               <div className="rounded-2xl bg-neutral-950 border border-neutral-800 p-4 flex items-start gap-3">
                 <Sparkles className="w-5 h-5 text-cyan-400 mt-0.5" />
-                <p>FaceForensics micro prep defaults to `c40`, `8` sequences, and `4` frames per sequence.</p>
+                <p>The current bundle stays CPU-friendly by using a frozen MobileNet image backbone with a lightweight trained classifier head.</p>
               </div>
               <div className="rounded-2xl bg-neutral-950 border border-neutral-800 p-4 flex items-start gap-3">
                 <CheckCircle2 className="w-5 h-5 text-emerald-400 mt-0.5" />
-                <p>Training caps each label at `32` images by default to prevent runaway memory use on your machine.</p>
+                <p>The UI now surfaces accuracy, precision, recall, F1, confidence, and validation history directly beside each scan.</p>
               </div>
               <div className="rounded-2xl bg-neutral-950 border border-neutral-800 p-4 flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5" />
-                <p>Video support is intentionally deferred here because CPU-only frame pipelines are much heavier than the image route.</p>
+                <p>High metrics still depend on the dataset quality and class balance, so deployment should follow the refreshed Kaggle-backed bundle rather than the older heuristic artifact.</p>
               </div>
             </div>
           </div>
 
           <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6">
             <h3 className="text-xl font-bold text-white mb-4">Sample Test Image</h3>
-            <p className="text-neutral-400 mb-4">
-              Use this bundled sample image to smoke-test the detector after deployment.
-            </p>
+            <p className="text-neutral-400 mb-4">Use this bundled sample image to smoke-test the detector after deployment.</p>
             <a
               href="/samples/deepfake-sample.png"
               target="_blank"
@@ -452,9 +604,6 @@ export function Deepfake() {
                 className="w-full h-56 object-cover"
               />
             </a>
-            <p className="text-sm text-neutral-500 mt-3">
-              Open the image, save it locally if needed, then upload it on this page to test the end-to-end flow.
-            </p>
           </div>
         </motion.aside>
       </div>

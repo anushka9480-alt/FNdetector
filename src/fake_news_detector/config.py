@@ -17,6 +17,7 @@ class TrainingConfig:
     eval_batch_size: int = 4
     gradient_accumulation_steps: int = 4
     num_epochs: int = 2
+    max_epochs: int = 6
     learning_rate: float = 2e-5
     weight_decay: float = 0.01
     warmup_ratio: float = 0.1
@@ -25,6 +26,10 @@ class TrainingConfig:
     seed: int = 42
     device: str = "cpu"
     use_mixed_precision: bool = False
+    decision_threshold: float = 0.65
+    uncertainty_margin: float = 0.1
+    target_accuracy: float = 0.9
+    target_confidence: float = 0.85
 
     @classmethod
     def from_file(cls, path: str | Path) -> "TrainingConfig":
